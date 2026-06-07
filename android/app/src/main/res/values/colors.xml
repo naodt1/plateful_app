@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand green — matches AppColors.primary (#2E7D5B) in the Flutter app -->
+    <color name="brand_green">#FF2E7D5B</color>
+</resources>
