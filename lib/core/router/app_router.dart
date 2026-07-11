@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/firebase_service.dart';
 
 import '../../features/splash/splash_screen.dart';
-import '../../features/onboarding/screens/onboarding_screen.dart';
-import '../../features/onboarding/screens/diet_mode_screen.dart';
+import '../../features/onboarding/screens/onboarding_flow_screen.dart';
+import '../../features/onboarding/screens/login_screen.dart';
 import '../../features/onboarding/screens/signup_screen.dart';
 import '../../features/home/screens/home_screen.dart';
 import '../../features/recipe/screens/recipe_detail_screen.dart';
@@ -30,19 +30,19 @@ class AppRouter {
         navigatorKey: _rootNavigatorKey,
         initialLocation: '/splash',
         redirect: (context, state) {
-          final user = Supabase.instance.client.auth.currentUser;
-          final isAuth = user != null;
+          final isAuth = FirebaseService.currentUserId != null;
           final isSplash = state.matchedLocation == '/splash';
           final isOnboarding = state.matchedLocation.startsWith('/onboarding');
           final isSignup = state.matchedLocation == '/signup';
+          final isLogin = state.matchedLocation == '/login';
 
           // Let the splash handle its own navigation
           if (isSplash) return null;
 
-          if (!isAuth && !isOnboarding && !isSignup) {
+          if (!isAuth && !isOnboarding && !isSignup && !isLogin) {
             return '/onboarding';
           }
-          if (isAuth && isOnboarding) {
+          if (isAuth && (isOnboarding || isSignup || isLogin)) {
             return '/home';
           }
           return null;
@@ -58,11 +58,11 @@ class AppRouter {
           ),
           GoRoute(
             path: '/onboarding',
-            builder: (_, __) => const OnboardingScreen(),
+            builder: (_, __) => const OnboardingFlowScreen(),
           ),
           GoRoute(
-            path: '/onboarding/diet',
-            builder: (_, __) => const DietModeScreen(),
+            path: '/login',
+            builder: (_, __) => const LoginScreen(),
           ),
           GoRoute(
             path: '/signup',

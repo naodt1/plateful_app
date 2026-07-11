@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "42236543449",
+    "project_id": "plateful-d10ff",
+    "storage_bucket": "plateful-d10ff.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:42236543449:android:fc0554e02f6f3db2ab99c8",
+        "android_client_info": {
+          "package_name": "com.naodtadele.plateful"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "42236543449-k6cjrv9ref3te5ujbns3n8tlsv5rt019.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.naodtadele.plateful",
+            "certificate_hash": "05f631bb7513cf42ad0e73ac527c3cbca4ae1955"
+          }
+        },
+        {
+          "client_id": "42236543449-093atj69rhrdqiq766bh1qi3da9hqeuj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC3RE3jtWMIhkr_azgGR5w7R2AlvmN7aK4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "42236543449-093atj69rhrdqiq766bh1qi3da9hqeuj.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../core/services/supabase_service.dart';
+import '../../../core/services/firebase_service.dart';
 import '../../../core/widgets/skeleton_loader.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../models/pantry_item.dart';
@@ -11,7 +11,7 @@ import '../widgets/pantry_suggestions_sheet.dart';
 
 final _pantryProvider =
     FutureProvider.autoDispose<List<PantryItem>>((ref) {
-  return SupabaseService.getPantryItems();
+  return FirebaseService.getPantryItems();
 });
 
 // Category → emoji map
@@ -74,7 +74,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
   ];
 
   Future<void> _deleteItem(String id) async {
-    await SupabaseService.deletePantryItem(id);
+    await FirebaseService.deletePantryItem(id);
     ref.invalidate(_pantryProvider);
   }
 
@@ -199,7 +199,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
                           final name = nameCtrl.text.trim();
                           if (name.isEmpty) return;
                           final userId =
-                              SupabaseService.currentUser?.id ?? '';
+                              FirebaseService.currentUserId ?? '';
                           final item = PantryItem(
                             id: const Uuid().v4(),
                             userId: userId,
@@ -208,7 +208,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
                             quantity: qtyCtrl.text.trim(),
                             addedAt: DateTime.now(),
                           );
-                          await SupabaseService.addPantryItem(item);
+                          await FirebaseService.addPantryItem(item);
                           ref.invalidate(_pantryProvider);
                           if (ctx.mounted) Navigator.pop(ctx);
                         },

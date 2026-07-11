@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/supabase_service.dart';
+import '../services/firebase_service.dart';
 import '../../models/recipe.dart';
 import '../../models/collection.dart';
 
@@ -7,15 +7,15 @@ import '../../models/collection.dart';
 /// (add, edit, delete, import) can refresh the home screen by invalidating them.
 
 final recipesProvider = FutureProvider<List<Recipe>>((ref) async {
-  return SupabaseService.getRecipes();
+  return FirebaseService.getRecipes();
 });
 
 final collectionsProvider = FutureProvider<List<Collection>>((ref) async {
-  return SupabaseService.getCollections();
+  return FirebaseService.getCollections();
 });
 
 final profileProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
-  return SupabaseService.getProfile();
+  return FirebaseService.getProfile();
 });
 
 /// Invalidate every recipe-related provider so screens re-fetch fresh data.

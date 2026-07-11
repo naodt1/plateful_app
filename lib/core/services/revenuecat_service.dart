@@ -30,7 +30,12 @@ class RevenueCatService {
   String? get _apiKey {
     if (kIsWeb) return null;
     if (Platform.isAndroid) {
-      return dotenv.env['REVENUECAT_ANDROID_API_KEY'];
+      // In release builds use the real Play Store key (goog_...). A test_ key
+      // makes the RevenueCat SDK intentionally crash release builds, so we
+      // only fall back to it in debug.
+      final prod = dotenv.env['REVENUECAT_ANDROID_API_KEY'];
+      final dev = dotenv.env['REVENUECAT_ANDROID_TEST_KEY'] ?? prod;
+      return kReleaseMode ? prod : dev;
     }
     if (Platform.isIOS || Platform.isMacOS) {
       return dotenv.env['REVENUECAT_IOS_API_KEY'];
@@ -38,13 +43,26 @@ class RevenueCatService {
     return null;
   }
 
+  /// Whether a key is safe to configure with in the current build mode.
+  /// - test_ keys are allowed ONLY in debug (they crash release builds).
+  /// - placeholder keys (REPLACE...) are never valid.
+  /// - any other non-empty key is treated as a real key.
+  bool _isUsableKey(String? key) {
+    if (key == null || key.isEmpty) return false;
+    if (key.contains('REPLACE')) return false; // placeholder, not set yet
+    if (key.startsWith('test_') && kReleaseMode) return false; // crashes release
+    return true;
+  }
+
   /// Configure the SDK. Call once during app startup, before runApp.
-  /// Safe to call when no key is present (e.g. web / tests) — it no-ops.
+  /// Safe to call when no usable key is present — it no-ops so the app runs
+  /// normally (just without in-app purchases).
   Future<void> configure() async {
     if (_configured) return;
     final key = _apiKey;
-    if (key == null || key.isEmpty) {
-      debugPrint('RevenueCat: no API key for this platform, skipping configure');
+    if (!_isUsableKey(key)) {
+      debugPrint(
+          'RevenueCat: no usable key for this build, skipping configure');
       return;
     }
 
@@ -52,7 +70,7 @@ class RevenueCatService {
     await Purchases.setLogLevel(
         kDebugMode ? LogLevel.debug : LogLevel.warn);
 
-    await Purchases.configure(PurchasesConfiguration(key));
+    await Purchases.configure(PurchasesConfiguration(key!));
     _configured = true;
 
     // Seed + subscribe to live updates.
@@ -78,13 +96,18 @@ class RevenueCatService {
     }
   }
 
-  /// Detach the anonymous/identified user (call on sign-out).
+  /// Detach the identified user (call on sign-out).
+  /// No-ops if the SDK user is already anonymous — calling logOut() on an
+  /// anonymous user throws in the RevenueCat SDK.
   Future<void> logOut() async {
     if (!_configured) return;
     try {
+      final isAnonymous = await Purchases.isAnonymous;
+      if (isAnonymous) return; // nothing to log out
       customerInfo.value = await Purchases.logOut();
     } catch (e) {
-      debugPrint('RevenueCat: logOut failed: $e');
+      // Never let a billing/SDK error crash sign-out.
+      debugPrint('RevenueCat: logOut failed (ignored): $e');
     }
   }
 
@@ -124,6 +147,19 @@ class RevenueCatService {
       return PurchaseResult(success: false, error: _messageFor(code));
     } catch (e) {
       return PurchaseResult(success: false, error: e.toString());
+    }
+  }
+
+  /// Pull the latest [CustomerInfo] from RevenueCat and publish it, so feature
+  /// gating reacts to entitlements that became active out-of-band — a renewal,
+  /// a purchase made on another device, or a dashboard/product mapping change.
+  /// Safe to call often; no-ops if the SDK isn't configured.
+  Future<void> refresh() async {
+    if (!_configured) return;
+    try {
+      customerInfo.value = await Purchases.getCustomerInfo();
+    } catch (e) {
+      debugPrint('RevenueCat: refresh failed: $e');
     }
   }
 

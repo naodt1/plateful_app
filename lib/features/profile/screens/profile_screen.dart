@@ -6,15 +6,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_colors.dart' show AppColors, AppColorScheme;
 import '../../../core/theme/app_text_styles.dart';
 import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
-import '../../../core/services/supabase_service.dart';
+import '../../../core/services/firebase_service.dart';
+import '../../../core/services/revenuecat_service.dart';
 import '../../../core/widgets/skeleton_loader.dart';
 import '../../../core/providers/theme_provider.dart';
 import '../../../core/providers/subscription_provider.dart';
 import '../../subscription/paywall.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 
 final _profileDetailProvider =
     FutureProvider.autoDispose<Map<String, dynamic>?>((ref) {
-  return SupabaseService.getProfile();
+  return FirebaseService.getProfile();
 });
 
 const _diets = [
@@ -36,7 +38,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Future<void> _updateDiet(String diet) async {
-    await SupabaseService.updateProfile({'diet_mode': diet});
+    await FirebaseService.updateProfile({'diet_mode': diet});
     ref.invalidate(_profileDetailProvider);
   }
 
@@ -255,6 +257,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Future<void> _openCustomerCenter() async {
     try {
       await RevenueCatUI.presentCustomerCenter();
+      // The user may have restored/cancelled inside the Customer Center — pull
+      // fresh entitlement state so the UI reflects it immediately.
+      await RevenueCatService.instance.refresh();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -265,30 +270,158 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _signOut() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: 'Sign Out',
+      message: 'Are you sure you want to sign out?',
+      confirmLabel: 'Sign Out',
+      icon: Icons.logout,
+    );
+    if (confirmed) {
+      await FirebaseService.signOut();
+      if (mounted) context.go('/onboarding');
+    }
+  }
+
+  Future<void> _deleteAccount() async {
+    final colors = AppColors.of(context);
+    // Step 1: explain + confirm
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: 'Delete account?',
+      message:
+          'This permanently deletes your account and all your data — recipes, '
+          'collections, pantry, meal plans and grocery lists. This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+      icon: Icons.delete_outline,
+    );
+    if (!confirmed) return;
+
+    // Step 2: type-to-confirm (Play-store friendly, prevents accidents)
+    final controller = TextEditingController();
+    final colorsForDialog = AppColors.of(context);
+    final reallyDelete = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Sign Out'),
-        content: const Text('Are you sure you want to sign out?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
+      builder: (ctx) {
+        return StatefulBuilder(builder: (ctx, setLocal) {
+          final canDelete =
+              controller.text.trim().toUpperCase() == 'DELETE';
+          return Dialog(
+            backgroundColor: colorsForDialog.bg,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 32),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24)),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.warning_amber_rounded,
+                        color: AppColors.error, size: 28),
+                  ),
+                  const SizedBox(height: 16),
+                  Text('Confirm deletion',
+                      style: AppTextStyles.headingMedium,
+                      textAlign: TextAlign.center),
+                  const SizedBox(height: 10),
+                  Text('Type DELETE to permanently remove your account.',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                          color: colorsForDialog.textSecondary, height: 1.45),
+                      textAlign: TextAlign.center),
+                  const SizedBox(height: 18),
+                  TextField(
+                    controller: controller,
+                    autofocus: true,
+                    textAlign: TextAlign.center,
+                    textCapitalization: TextCapitalization.characters,
+                    onChanged: (_) => setLocal(() {}),
+                    decoration: const InputDecoration(hintText: 'DELETE'),
+                  ),
+                  const SizedBox(height: 22),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: canDelete
+                          ? () => Navigator.pop(ctx, true)
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.error,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor:
+                            AppColors.error.withValues(alpha: 0.3),
+                        minimumSize: const Size(0, 52),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('Delete forever',
+                          style: TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(0, 48),
+                        foregroundColor: colorsForDialog.textSecondary,
+                      ),
+                      child: const Text('Cancel',
+                          style: TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            child: const Text('Sign Out'),
+          );
+        });
+      },
+    );
+    if (reallyDelete != true) return;
+
+    // Step 3: run deletion with a blocking spinner
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Center(
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: colors.bg,
+            borderRadius: BorderRadius.circular(16),
           ),
-        ],
+          child: const CircularProgressIndicator(color: AppColors.primary),
+        ),
       ),
     );
-    if (confirmed == true) {
-      await SupabaseService.signOut();
-      if (mounted) context.go('/onboarding');
+    try {
+      await ref.read(revenueCatProvider).logOut();
+      await FirebaseService.deleteAccount();
+      if (mounted) {
+        Navigator.of(context).pop(); // close spinner
+        context.go('/onboarding');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Your account has been deleted.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // close spinner
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not delete account: $e')),
+        );
+      }
     }
   }
 
@@ -296,14 +429,37 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
     final profileAsync = ref.watch(_profileDetailProvider);
-    final user = SupabaseService.currentUser;
+    final user = FirebaseService.currentUser;
     final isDark = ref.watch(themeModeProvider) == ThemeMode.dark;
     final isPro = ref.watch(isProProvider);
 
     return Scaffold(
       backgroundColor: colors.bg,
       appBar: AppBar(
-        title: Text('Profile', style: AppTextStyles.headingMedium),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Profile', style: AppTextStyles.headingMedium),
+            if (isPro) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text('PRO',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    )),
+              ),
+            ],
+          ],
+        ),
         automaticallyImplyLeading: false,
         backgroundColor: colors.bg,
       ),
@@ -357,14 +513,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
               const SizedBox(height: 24),
 
-              // ── Subscription banner ─────────────────────────────────
-              _ProBanner(
-                isPro: isPro,
-                colors: colors,
-                onUpgrade: () => PlatefulPaywall.forcePresent(context),
-                onManage: _openCustomerCenter,
-              ),
-              const SizedBox(height: 24),
+              // ── Subscription banner (only for free users) ───────────
+              if (!isPro) ...[
+                _ProBanner(
+                  isPro: false,
+                  colors: colors,
+                  onUpgrade: () => PlatefulPaywall.forcePresent(context),
+                  onManage: _openCustomerCenter,
+                ),
+                const SizedBox(height: 24),
+              ],
 
               // ── Preferences ─────────────────────────────────────────
               _SectionTitle('Preferences', colors: colors),
@@ -466,6 +624,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     colors: colors,
                     trailing: _chevron(colors),
                     onTap: _openCustomerCenter,
+                  ),
+                  _Divider(colors),
+                  _Row(
+                    icon: Icons.delete_outline,
+                    label: 'Delete Account',
+                    colors: colors,
+                    iconColor: AppColors.error,
+                    labelColor: AppColors.error,
+                    trailing: _chevron(colors),
+                    onTap: _deleteAccount,
                   ),
                 ],
               ),
@@ -759,7 +927,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     if (name.isEmpty) return;
     setState(() => _saving = true);
     try {
-      await SupabaseService.updateProfile({'display_name': name});
+      await FirebaseService.updateProfile({'display_name': name});
       widget.onSaved();
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -878,7 +1046,7 @@ class _PrivacySecuritySheetState extends State<_PrivacySecuritySheet> {
   @override
   void initState() {
     super.initState();
-    _emailController.text = SupabaseService.currentUser?.email ?? '';
+    _emailController.text = FirebaseService.currentUser?.email ?? '';
   }
 
   @override
@@ -892,7 +1060,7 @@ class _PrivacySecuritySheetState extends State<_PrivacySecuritySheet> {
     if (email.isEmpty) return;
     setState(() => _sending = true);
     try {
-      await SupabaseService.client.auth.resetPasswordForEmail(email);
+      await FirebaseService.resetPassword(email);
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -912,47 +1080,6 @@ class _PrivacySecuritySheetState extends State<_PrivacySecuritySheet> {
     }
   }
 
-  Future<void> _requestAccountDeletion() async {
-    final colors = AppColors.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: colors.bg,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Delete Account'),
-        content: const Text(
-            'This will permanently delete your account and all associated data. This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true && mounted) {
-      // In production: call a Supabase Edge Function or admin API.
-      // For now we sign out and show a message.
-      await SupabaseService.signOut();
-      if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text(
-                  'Account deletion requested. Our team will process it within 48 hours.')),
-        );
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1037,36 +1164,6 @@ class _PrivacySecuritySheetState extends State<_PrivacySecuritySheet> {
                     style: TextStyle(color: AppColors.primary)),
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: AppColors.primary),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 28),
-            Divider(color: colors.border),
-            const SizedBox(height: 16),
-            // Danger zone
-            Text('Danger Zone',
-                style: AppTextStyles.labelLarge
-                    .copyWith(color: AppColors.error)),
-            const SizedBox(height: 8),
-            Text(
-              'Permanently delete your Plateful account and all your data.',
-              style: AppTextStyles.bodySmall
-                  .copyWith(color: colors.textSecondary),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: OutlinedButton.icon(
-                onPressed: _requestAccountDeletion,
-                icon: const Icon(Icons.delete_forever_outlined,
-                    color: AppColors.error),
-                label: const Text('Delete My Account',
-                    style: TextStyle(color: AppColors.error)),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.error),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),
@@ -1297,6 +1394,8 @@ class _Row extends StatelessWidget {
   final Widget trailing;
   final VoidCallback onTap;
   final AppColorScheme colors;
+  final Color? iconColor;
+  final Color? labelColor;
 
   const _Row({
     required this.icon,
@@ -1304,6 +1403,8 @@ class _Row extends StatelessWidget {
     required this.trailing,
     required this.onTap,
     required this.colors,
+    this.iconColor,
+    this.labelColor,
   });
 
   @override
@@ -1315,12 +1416,12 @@ class _Row extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            Icon(icon, color: AppColors.primary, size: 22),
+            Icon(icon, color: iconColor ?? AppColors.primary, size: 22),
             const SizedBox(width: 14),
             Expanded(
               child: Text(label,
                   style: AppTextStyles.bodyMedium
-                      .copyWith(color: colors.textPrimary)),
+                      .copyWith(color: labelColor ?? colors.textPrimary)),
             ),
             trailing,
           ],

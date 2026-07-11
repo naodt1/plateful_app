@@ -1,9 +1,27 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const DEEPSEEK_API_KEY = Deno.env.get("DEEPSEEK_API_KEY") ?? "";
 const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY") ?? "";
 const DEEPSEEK_MODEL = "deepseek-chat"; // DeepSeek V3 Pro (aka deepseek-chat)
 const FIRECRAWL_URL = "https://api.firecrawl.dev/v2/scrape";
+
+// DeepSeek deepseek-chat pricing, USD per 1M tokens.
+// VERIFY/UPDATE at https://api-docs.deepseek.com (rates change; off-peak is cheaper).
+const PRICE_INPUT_CACHE_HIT = 0.07;
+const PRICE_INPUT_CACHE_MISS = 0.27;
+const PRICE_OUTPUT = 1.10;
+
+/** Compute USD cost from a DeepSeek/OpenAI-style usage object. */
+function deepseekCost(usage: Record<string, number> | undefined) {
+  const u = usage ?? {};
+  const hit = u.prompt_cache_hit_tokens ?? 0;
+  const miss = u.prompt_cache_miss_tokens ?? Math.max((u.prompt_tokens ?? 0) - hit, 0);
+  const out = u.completion_tokens ?? 0;
+  const costUsd =
+    (hit / 1e6) * PRICE_INPUT_CACHE_HIT +
+    (miss / 1e6) * PRICE_INPUT_CACHE_MISS +
+    (out / 1e6) * PRICE_OUTPUT;
+  return { usage: u, costUsd: Number(costUsd.toFixed(6)) };
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -235,6 +253,10 @@ Rules:
   }
 
   const data = await response.json();
+  const { usage, costUsd } = deepseekCost(data.usage);
+  // Cost analytics: console only (visible in `supabase functions logs extract-recipe`).
+  // Intentionally NOT returned to the client / UI.
+  console.log(JSON.stringify({ fn: "extract-recipe", model: DEEPSEEK_MODEL, usage, costUsd }));
   // OpenAI-compatible response: choices[0].message.content
   const text = data.choices[0].message.content as string;
   const jsonMatch = text.match(/{[\s\S]*}/);
@@ -247,9 +269,17 @@ Rules:
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
+  }
+
+  const APP_SECRET = Deno.env.get("PLATEFUL_APP_SECRET") ?? "";
+  if (APP_SECRET && req.headers.get("x-plateful-key") !== APP_SECRET) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   try {

@@ -3,13 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../core/services/supabase_service.dart';
+import '../../../core/services/firebase_service.dart';
 import '../../../core/widgets/skeleton_loader.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../models/collection.dart';
 
 final _collectionsDetailProvider = FutureProvider.autoDispose<List<Collection>>((ref) {
-  return SupabaseService.getCollections();
+  return FirebaseService.getCollections();
 });
 
 class CollectionsScreen extends ConsumerWidget {
@@ -112,7 +112,7 @@ class CollectionsScreen extends ConsumerWidget {
           ElevatedButton(
             onPressed: () async {
               if (controller.text.trim().isNotEmpty) {
-                await SupabaseService.createCollection(controller.text.trim());
+                await FirebaseService.createCollection(controller.text.trim());
                 ref.invalidate(_collectionsDetailProvider);
                 if (context.mounted) Navigator.pop(context);
               }

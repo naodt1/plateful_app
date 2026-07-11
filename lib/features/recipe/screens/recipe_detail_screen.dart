@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -9,7 +10,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/providers/recipe_providers.dart';
-import '../../../core/services/supabase_service.dart';
+import '../../../core/services/firebase_service.dart';
 import '../../../core/services/claude_service.dart';
 import '../../../core/widgets/skeleton_loader.dart';
 import '../../../models/recipe.dart';
@@ -21,6 +22,7 @@ import '../widgets/nutrition_card.dart';
 import '../widgets/healthify_sheet.dart';
 import 'add_recipe_screen.dart';
 import '../widgets/servings_adjuster.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 import '../../subscription/pro_gate.dart';
 import '../../../core/providers/subscription_provider.dart';
 
@@ -47,8 +49,9 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
   int _servings = 4;
 
   final ScrollController _scrollController = ScrollController();
-  // 0 = no blur (top), 1 = fully blurred (scrolled past hero).
-  double _blur = 0;
+  // 0 = no blur (top), 1 = fully blurred. A ValueNotifier so only the blur
+  // layer rebuilds on scroll — not the whole screen (keeps scrolling smooth).
+  final ValueNotifier<double> _blur = ValueNotifier<double>(0);
 
   @override
   void initState() {
@@ -68,8 +71,8 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
     const maxScroll = 220.0;
     final offset = _scrollController.offset.clamp(0.0, maxScroll);
     final next = offset / maxScroll;
-    if ((next - _blur).abs() > 0.01) {
-      setState(() => _blur = next);
+    if ((next - _blur.value).abs() > 0.02) {
+      _blur.value = next; // no setState → no full-tree rebuild
     }
   }
 
@@ -77,12 +80,13 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _blur.dispose();
     super.dispose();
   }
 
   Future<void> _loadRecipe() async {
     try {
-      final recipe = await SupabaseService.getRecipe(widget.recipeId);
+      final recipe = await FirebaseService.getRecipe(widget.recipeId);
       if (mounted) {
         setState(() {
           if (recipe != null) {
@@ -162,9 +166,9 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
   Future<void> _addToGroceryList() async {
     final recipe = _recipe;
     if (recipe == null) return;
-    final userId = SupabaseService.currentUser?.id ?? '';
+    final userId = FirebaseService.currentUserId ?? '';
     for (final ingredient in _scaledIngredients) {
-      await SupabaseService.addGroceryItem(GroceryItem(
+      await FirebaseService.addGroceryItem(GroceryItem(
         id: const Uuid().v4(),
         userId: userId,
         name: ingredient.name,
@@ -232,30 +236,17 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
   Future<void> _confirmDelete() async {
     final recipe = _recipe;
     if (recipe == null) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Delete recipe?'),
-        content: Text('"${recipe.title}" will be permanently removed.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: 'Delete recipe?',
+      message: '"${recipe.title}" will be permanently removed.',
+      confirmLabel: 'Delete',
+      destructive: true,
+      icon: Icons.delete_outline,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     try {
-      await SupabaseService.deleteRecipe(recipe.id);
+      await FirebaseService.deleteRecipe(recipe.id);
       refreshRecipeData(ref); // refresh home screen
       if (mounted) {
         context.pop();
@@ -291,7 +282,7 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
         slivers: [
           // ── Hero ──────────────────────────────────────────────────────────
           SliverAppBar(
-            expandedHeight: 300,
+            expandedHeight: 272,
             pinned: true,
             backgroundColor: colors.bg,
             leading: GestureDetector(
@@ -367,18 +358,25 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
                           )
                         : _HeroPlaceholder(colors: colors),
                     // Progressive blur as the user scrolls — adds depth.
-                    if (_blur > 0)
-                      Positioned.fill(
-                        child: BackdropFilter(
-                          filter: ui.ImageFilter.blur(
-                            sigmaX: _blur * 12,
-                            sigmaY: _blur * 12,
-                          ),
-                          child: Container(
-                            color: Colors.black.withValues(alpha: _blur * 0.15),
-                          ),
-                        ),
+                    // Only this layer rebuilds (ValueListenableBuilder), so the
+                    // scroll stays smooth.
+                    Positioned.fill(
+                      child: ValueListenableBuilder<double>(
+                        valueListenable: _blur,
+                        builder: (context, blur, _) {
+                          if (blur <= 0) return const SizedBox.shrink();
+                          return BackdropFilter(
+                            filter: ui.ImageFilter.blur(
+                              sigmaX: blur * 12,
+                              sigmaY: blur * 12,
+                            ),
+                            child: Container(
+                              color: Colors.black.withValues(alpha: blur * 0.15),
+                            ),
+                          );
+                        },
                       ),
+                    ),
                     // Subtle gradient so the back/menu buttons stay legible.
                     DecoratedBox(
                       decoration: BoxDecoration(
@@ -394,6 +392,20 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
                         ),
                       ),
                     ),
+                    // Rounded lip overlapping the image bottom so the content
+                    // sheet visibly curves over the photo.
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Container(
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: colors.bg,
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(28),
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -404,6 +416,9 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
             child: Container(
               decoration: BoxDecoration(
                 color: colors.bg,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(28),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -414,11 +429,20 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Tags
+                        // Title
+                        Text(recipe.title,
+                                style: AppTextStyles.displayMedium,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis)
+                            .animate()
+                            .fadeIn(),
+                        const SizedBox(height: 10),
+
+                        // Tags (below title)
                         if (recipe.tags.isNotEmpty)
                           Wrap(
                             spacing: 8,
-                            runSpacing: 4,
+                            runSpacing: 6,
                             children: recipe.tags.take(3).map((tag) =>
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -434,13 +458,6 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
                                         fontWeight: FontWeight.w500)),
                               )).toList(),
                           ),
-                        const SizedBox(height: 10),
-                        Text(recipe.title,
-                                style: AppTextStyles.displayMedium,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis)
-                            .animate()
-                            .fadeIn(),
                         const SizedBox(height: 8),
 
                         // Description with "see more"
@@ -725,15 +742,13 @@ class _AiActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = AppColors.of(context);
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
+          color: color,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Row(
           children: [
@@ -741,7 +756,7 @@ class _AiActionButton extends StatelessWidget {
               width: 34,
               height: 34,
               decoration: BoxDecoration(
-                color: color,
+                color: Colors.white.withValues(alpha: 0.18),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(icon, color: Colors.white, size: 18),
@@ -751,17 +766,17 @@ class _AiActionButton extends StatelessWidget {
               child: Text(label,
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
-                  style: TextStyle(
+                  style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: colors.textPrimary)),
+                      color: Colors.white)),
             ),
             if (showProBadge)
-              Padding(
-                padding: const EdgeInsets.only(left: 4),
+              const Padding(
+                padding: EdgeInsets.only(left: 4),
                 child: Icon(Icons.lock_outline,
-                    color: colors.textSecondary, size: 16),
-            ),
+                    color: Colors.white70, size: 16),
+              ),
           ],
         ),
       ),
@@ -1205,7 +1220,7 @@ class _MealPlanPickerSheetState extends State<_MealPlanPickerSheet> {
           DateTime(weekStart.year, weekStart.month, weekStart.day);
 
       final existing =
-          await SupabaseService.getMealPlanForWeek(normalizedWeekStart);
+          await FirebaseService.getMealPlanForWeek(normalizedWeekStart);
       final currentSlots = Map<String, Map<String, MealSlot>>.from(
         (existing?.slots ?? {}).map(
           (k, v) => MapEntry(k, Map<String, MealSlot>.from(v)),
@@ -1220,9 +1235,9 @@ class _MealPlanPickerSheetState extends State<_MealPlanPickerSheet> {
         ),
       };
 
-      await SupabaseService.saveMealPlan(MealPlan(
+      await FirebaseService.saveMealPlan(MealPlan(
         id: existing?.id ?? const Uuid().v4(),
-        userId: SupabaseService.currentUser?.id ?? '',
+        userId: FirebaseService.currentUserId ?? '',
         weekStart: normalizedWeekStart,
         slots: currentSlots,
       ));
@@ -1274,7 +1289,7 @@ class _TailorSheetState extends State<TailorSheet> {
 
   Future<void> _loadProfile() async {
     try {
-      final profile = await SupabaseService.getProfile();
+      final profile = await FirebaseService.getProfile();
       if (mounted && profile != null) {
         final allergiesRaw = profile['allergies'];
         setState(() {
@@ -1838,6 +1853,19 @@ class _CookingModeScreenState extends State<CookingModeScreen> {
   int _currentStep = 0;
 
   @override
+  void initState() {
+    super.initState();
+    // Keep the screen awake while cooking so it never dims or locks mid-recipe.
+    WakelockPlus.enable();
+  }
+
+  @override
+  void dispose() {
+    WakelockPlus.disable();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final step = widget.steps[_currentStep];
     final isFirst = _currentStep == 0;
@@ -2149,8 +2177,8 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
   }
 
   Future<void> _load() async {
-    final collections = await SupabaseService.getCollections();
-    final ids = await SupabaseService.getRecipeCollectionIds(widget.recipeId);
+    final collections = await FirebaseService.getCollections();
+    final ids = await FirebaseService.getRecipeCollectionIds(widget.recipeId);
     if (mounted) {
       setState(() {
         _collections = collections;
@@ -2171,9 +2199,9 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
     });
     try {
       if (inCollection) {
-        await SupabaseService.removeRecipeFromCollection(col.id, widget.recipeId);
+        await FirebaseService.removeRecipeFromCollection(col.id, widget.recipeId);
       } else {
-        await SupabaseService.addRecipeToCollection(col.id, widget.recipeId);
+        await FirebaseService.addRecipeToCollection(col.id, widget.recipeId);
       }
     } catch (e) {
       // revert on error
@@ -2209,7 +2237,7 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
       ),
     );
     if (name == null || name.isEmpty) return;
-    await SupabaseService.createCollection(name);
+    await FirebaseService.createCollection(name);
     await _load();
     // Auto-add to the new collection
     final newCol = _collections?.firstWhere((c) => c.name == name,

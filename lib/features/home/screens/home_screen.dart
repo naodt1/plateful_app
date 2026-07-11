@@ -10,14 +10,31 @@ import '../widgets/recipe_card.dart';
 import '../widgets/collections_row.dart';
 import '../widgets/pantry_banner.dart';
 import '../../recipe/screens/add_recipe_screen.dart';
+import '../../../core/services/demo_seed_service.dart';
 
 // Aliases to the shared providers so the rest of this file is unchanged.
 final _recipesProvider = recipesProvider;
 final _collectionsProvider = collectionsProvider;
 final _profileProvider = profileProvider;
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Seed the onboarding demo recipe on first authenticated load (the flag is
+    // set during onboarding). Refresh the list if something was inserted.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final seeded = await DemoSeedService.seedIfPending();
+      if (seeded && mounted) ref.invalidate(_recipesProvider);
+    });
+  }
 
   void _showAddRecipeSheet(BuildContext context) {
     showModalBottomSheet(
@@ -41,7 +58,7 @@ class HomeScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final recipesAsync = ref.watch(_recipesProvider);
     final collectionsAsync = ref.watch(_collectionsProvider);
     final profileAsync = ref.watch(_profileProvider);

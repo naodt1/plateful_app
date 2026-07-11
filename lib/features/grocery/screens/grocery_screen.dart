@@ -3,15 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../core/services/supabase_service.dart';
+import '../../../core/services/firebase_service.dart';
 import '../../../core/widgets/skeleton_loader.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 import '../../../models/grocery_item.dart';
 import '../widgets/grocery_item_tile.dart';
 
 final _groceryProvider =
     FutureProvider.autoDispose<List<GroceryItem>>((ref) {
-  return SupabaseService.getGroceryItems();
+  return FirebaseService.getGroceryItems();
 });
 
 const _groceryCategories = [
@@ -33,48 +34,35 @@ class GroceryScreen extends ConsumerStatefulWidget {
 
 class _GroceryScreenState extends ConsumerState<GroceryScreen> {
   Future<void> _toggleItem(GroceryItem item, bool checked) async {
-    await SupabaseService.updateGroceryItem(item.copyWith(checked: checked));
+    await FirebaseService.updateGroceryItem(item.copyWith(checked: checked));
     ref.invalidate(_groceryProvider);
   }
 
   Future<void> _deleteItem(String id) async {
-    await SupabaseService.deleteGroceryItem(id);
+    await FirebaseService.deleteGroceryItem(id);
     ref.invalidate(_groceryProvider);
   }
 
   Future<void> _clearCompleted(List<GroceryItem> items) async {
     final checked = items.where((i) => i.checked).toList();
     for (final item in checked) {
-      await SupabaseService.deleteGroceryItem(item.id);
+      await FirebaseService.deleteGroceryItem(item.id);
     }
     ref.invalidate(_groceryProvider);
   }
 
   Future<void> _clearAll(List<GroceryItem> items) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Clear entire list?'),
-        content: Text('This will remove all ${items.length} items.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Clear All'),
-          ),
-        ],
-      ),
+    final confirm = await ConfirmDialog.show(
+      context,
+      title: 'Clear entire list?',
+      message: 'This will remove all ${items.length} items.',
+      confirmLabel: 'Clear All',
+      destructive: true,
+      icon: Icons.delete_sweep_outlined,
     );
-    if (confirm != true) return;
+    if (!confirm) return;
     for (final item in items) {
-      await SupabaseService.deleteGroceryItem(item.id);
+      await FirebaseService.deleteGroceryItem(item.id);
     }
     if (mounted) ref.invalidate(_groceryProvider);
   }
@@ -182,7 +170,7 @@ class _GroceryScreenState extends ConsumerState<GroceryScreen> {
                           final name = nameCtrl.text.trim();
                           if (name.isEmpty) return;
                           final userId =
-                              SupabaseService.currentUser?.id ?? '';
+                              FirebaseService.currentUserId ?? '';
                           final item = GroceryItem(
                             id: const Uuid().v4(),
                             userId: userId,
@@ -192,7 +180,7 @@ class _GroceryScreenState extends ConsumerState<GroceryScreen> {
                             checked: false,
                             createdAt: DateTime.now(),
                           );
-                          await SupabaseService.addGroceryItem(item);
+                          await FirebaseService.addGroceryItem(item);
                           ref.invalidate(_groceryProvider);
                           if (ctx.mounted) Navigator.pop(ctx);
                         },

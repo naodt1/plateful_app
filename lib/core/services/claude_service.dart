@@ -14,49 +14,48 @@ class NoRecipeFoundException implements Exception {
 }
 
 class ClaudeService {
-  // DeepSeek uses an OpenAI-compatible API
-  static const String _baseUrl = 'https://api.deepseek.com/v1/chat/completions';
-  static const String _model = 'deepseek-chat'; // DeepSeek V3 Pro
+  /// Deno Deploy function for server-side URL fetching + recipe extraction.
+  static const String _extractFunctionUrl =
+      'https://plateful-extract-recipe.naodt1.deno.net';
 
-  /// Supabase edge function URL for server-side URL fetching + extraction
-  static String get _extractFunctionUrl {
-    final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
-    return '$supabaseUrl/functions/v1/extract-recipe';
-  }
+  /// Deno Deploy function that proxies AI chat (keeps the AI key server-side).
+  static const String _aiChatUrl = 'https://plateful-ai-chat.naodt1.deno.net';
 
-  static String get _supabaseAnonKey =>
-      dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+  /// Shared secret sent with every request so the public Deno endpoints reject
+  /// calls that don't come from the app. Lives in .env (gitignored), not source.
+  static String get _appSecret => dotenv.env['PLATEFUL_APP_SECRET'] ?? '';
 
-  static String get _apiKey =>
-      dotenv.env['DEEPSEEK_API_KEY'] ??
-      const String.fromEnvironment('DEEPSEEK_API_KEY', defaultValue: '');
-
+  /// Runs an AI prompt through the server-side proxy. The AI provider key
+  /// lives only in the edge function, never in the shipped app.
   static Future<String> _chat(String prompt) async {
-    final response = await http.post(
-      Uri.parse(_baseUrl),
-      headers: {
-        // DeepSeek uses Bearer token auth (OpenAI-compatible)
-        'Authorization': 'Bearer $_apiKey',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'model': _model,
-        'max_tokens': 4096,
-        // OpenAI-compatible messages format
-        'messages': [
-          {'role': 'user', 'content': prompt},
-        ],
-      }),
-    );
+    for (int attempt = 0; attempt < 2; attempt++) {
+      try {
+        final response = await http
+            .post(
+              Uri.parse(_aiChatUrl),
+              headers: {'Content-Type': 'application/json', 'x-plateful-key': _appSecret},
+              body: jsonEncode({'prompt': prompt}),
+            )
+            .timeout(const Duration(seconds: 60));
 
-    if (response.statusCode != 200) {
-      throw Exception('DeepSeek API error: ${response.statusCode} ${response.body}');
+        if (response.statusCode == 429) {
+          throw Exception('AI rate limit reached. Please try again shortly.');
+        }
+        if (response.statusCode != 200) {
+          throw Exception('AI service error (${response.statusCode}).');
+        }
+
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        if (json['error'] != null) {
+          throw Exception(json['error'].toString());
+        }
+        return json['content'] as String? ?? '';
+      } on Exception {
+        if (attempt == 1) rethrow;
+        await Future.delayed(const Duration(seconds: 2));
+      }
     }
-
-    final json = jsonDecode(response.body) as Map<String, dynamic>;
-    // OpenAI-compatible response: choices[0].message.content
-    final choices = json['choices'] as List;
-    return (choices.first as Map<String, dynamic>)['message']['content'] as String;
+    throw Exception('Unexpected error contacting the AI service.');
   }
 
   static Map<String, dynamic>? _extractJson(String text) {
@@ -115,10 +114,7 @@ class ClaudeService {
     try {
       final response = await http.post(
         Uri.parse(_extractFunctionUrl),
-        headers: {
-          'Authorization': 'Bearer $_supabaseAnonKey',
-          'Content-Type': 'application/json',
-        },
+        headers: {'Content-Type': 'application/json', 'x-plateful-key': _appSecret},
         body: jsonEncode({'url': url}),
       ).timeout(const Duration(seconds: 60));
 

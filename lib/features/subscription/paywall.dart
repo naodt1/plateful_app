@@ -24,6 +24,7 @@ class PlatefulPaywall {
       // result of the interaction (purchased / restored / cancelled / error).
       final result = await RevenueCatUI.presentPaywallIfNeeded(
         RevenueCatService.entitlementId,
+        displayCloseButton: true,
       );
 
       switch (result) {
@@ -52,7 +53,8 @@ class PlatefulPaywall {
   static Future<bool> forcePresent(BuildContext context) async {
     final svc = RevenueCatService.instance;
     try {
-      final result = await RevenueCatUI.presentPaywall();
+      final result =
+          await RevenueCatUI.presentPaywall(displayCloseButton: true);
       if (result == PaywallResult.purchased ||
           result == PaywallResult.restored) {
         svc.customerInfo.value = await Purchases.getCustomerInfo();

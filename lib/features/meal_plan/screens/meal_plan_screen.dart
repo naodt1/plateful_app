@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../core/services/supabase_service.dart';
+import '../../../core/services/firebase_service.dart';
 import '../../../core/services/claude_service.dart';
 import '../../../core/widgets/skeleton_loader.dart';
 import '../../../models/meal_plan.dart';
@@ -19,11 +19,11 @@ DateTime _getWeekStart(DateTime date) {
 
 final _mealPlanProvider =
     FutureProvider.family<MealPlan?, DateTime>((ref, weekStart) {
-  return SupabaseService.getMealPlanForWeek(weekStart);
+  return FirebaseService.getMealPlanForWeek(weekStart);
 });
 
 final _savedRecipesProvider = FutureProvider<List<Recipe>>((ref) {
-  return SupabaseService.getRecipes();
+  return FirebaseService.getRecipes();
 });
 
 class MealPlanScreen extends ConsumerStatefulWidget {
@@ -54,7 +54,7 @@ class _MealPlanScreenState extends ConsumerState<MealPlanScreen> {
     if (!mounted) return;
     setState(() => _isGenerating = true);
     try {
-      final profile = await SupabaseService.getProfile();
+      final profile = await FirebaseService.getProfile();
       final dietMode = profile?['diet_mode'] as String? ?? 'None';
       final plan = await ClaudeService.generateMealPlan(dietMode);
 
@@ -96,12 +96,12 @@ class _MealPlanScreenState extends ConsumerState<MealPlanScreen> {
 
       final mealPlan = MealPlan(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
-        userId: SupabaseService.currentUser?.id ?? '',
+        userId: FirebaseService.currentUserId ?? '',
         weekStart: _weekStart,
         slots: slotsMap,
       );
 
-      await SupabaseService.saveMealPlan(mealPlan);
+      await FirebaseService.saveMealPlan(mealPlan);
       setState(() => _localPlan = mealPlan);
       ref.invalidate(_mealPlanProvider(_weekStart));
     } catch (e) {
@@ -142,7 +142,7 @@ class _MealPlanScreenState extends ConsumerState<MealPlanScreen> {
 
     final updated = MealPlan(
       id: currentPlan?.id ?? '',
-      userId: SupabaseService.currentUser?.id ?? '',
+      userId: FirebaseService.currentUserId ?? '',
       weekStart: _weekStart,
       slots: currentSlots,
     );
@@ -150,7 +150,7 @@ class _MealPlanScreenState extends ConsumerState<MealPlanScreen> {
     // Optimistic update so the UI reflects the change immediately.
     setState(() => _localPlan = updated);
     try {
-      await SupabaseService.saveMealPlan(updated);
+      await FirebaseService.saveMealPlan(updated);
       ref.invalidate(_mealPlanProvider(_weekStart));
     } catch (e) {
       if (mounted) {
@@ -177,7 +177,7 @@ class _MealPlanScreenState extends ConsumerState<MealPlanScreen> {
       weekStart: _weekStart,
       slots: currentSlots,
     );
-    await SupabaseService.saveMealPlan(updated);
+    await FirebaseService.saveMealPlan(updated);
     setState(() => _localPlan = updated);
     ref.invalidate(_mealPlanProvider(_weekStart));
   }
@@ -339,7 +339,7 @@ class _MealPlanScreenState extends ConsumerState<MealPlanScreen> {
                               MealPlan(
                                 id: '',
                                 userId:
-                                    SupabaseService.currentUser?.id ??
+                                    FirebaseService.currentUserId ??
                                         '',
                                 weekStart: _weekStart,
                                 slots: {},

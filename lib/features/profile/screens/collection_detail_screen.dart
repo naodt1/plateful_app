@@ -3,16 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../core/services/supabase_service.dart';
+import '../../../core/services/firebase_service.dart';
 import '../../../core/widgets/skeleton_loader.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../models/recipe.dart';
-import '../../../models/collection.dart';
-import '../../home/widgets/recipe_card.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 
 final _collectionRecipesProvider =
     FutureProvider.autoDispose.family<List<Recipe>, String>((ref, id) {
-  return SupabaseService.getCollectionRecipes(id);
+  return FirebaseService.getCollectionRecipes(id);
 });
 
 class CollectionDetailScreen extends ConsumerWidget {
@@ -210,34 +209,23 @@ class CollectionDetailScreen extends ConsumerWidget {
       ),
     );
     if (confirmed != true) return;
-    await SupabaseService.removeRecipeFromCollection(
+    await FirebaseService.removeRecipeFromCollection(
         collectionId, recipe.id);
     ref.invalidate(_collectionRecipesProvider(collectionId));
   }
 
   Future<void> _confirmDelete(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Delete collection?'),
-        content: Text(
-            '"$collectionName" and all its recipe links will be removed. The recipes themselves stay in your library.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.error,
-                foregroundColor: Colors.white),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: 'Delete collection?',
+      message:
+          '"$collectionName" and all its recipe links will be removed. The recipes themselves stay in your library.',
+      confirmLabel: 'Delete',
+      destructive: true,
+      icon: Icons.delete_outline,
     );
-    if (confirmed != true) return;
-    await SupabaseService.deleteCollection(collectionId);
+    if (!confirmed) return;
+    await FirebaseService.deleteCollection(collectionId);
     if (context.mounted) context.pop();
   }
 }

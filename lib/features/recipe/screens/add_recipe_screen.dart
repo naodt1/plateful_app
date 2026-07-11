@@ -5,12 +5,13 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/providers/recipe_providers.dart';
-import '../../../core/services/supabase_service.dart';
+import '../../../core/services/firebase_service.dart';
 import '../../../core/services/claude_service.dart';
 import '../../../core/widgets/airbnb_button.dart';
 import '../../../core/widgets/skeleton_loader.dart';
 import '../../../models/recipe.dart';
 import '../../../models/meal_plan.dart';
+import 'package:go_router/go_router.dart';
 import '../../subscription/pro_gate.dart';
 
 // Full-page screen kept for deep-link / share-sheet entry
@@ -150,7 +151,7 @@ class _AddRecipeSheetState extends ConsumerState<AddRecipeSheet>
     }
     setState(() => _isSaving = true);
     try {
-      final userId = SupabaseService.currentUser?.id ?? '';
+      final userId = FirebaseService.currentUserId ?? '';
       final ingredients = _ingredients.map((s) {
         final parts = s.trim().split(' ');
         final amount =
@@ -192,7 +193,7 @@ class _AddRecipeSheetState extends ConsumerState<AddRecipeSheet>
       );
 
       if (_isEditing) {
-        await SupabaseService.updateRecipe(recipe);
+        await FirebaseService.updateRecipe(recipe);
         refreshRecipeData(ref); // refresh home screen
         if (mounted) {
           Navigator.of(context).pop(true); // signal "changed" to caller
@@ -201,12 +202,12 @@ class _AddRecipeSheetState extends ConsumerState<AddRecipeSheet>
           );
         }
       } else {
-        final recipeId = await SupabaseService.saveRecipe(recipe);
-        final savedRecipe = recipe.copyWith(id: recipeId);
+        final recipeId = await FirebaseService.saveRecipe(recipe);
         refreshRecipeData(ref); // refresh home screen
         if (mounted) {
+          // Dismiss the sheet then navigate straight to the new recipe.
           Navigator.of(context).pop();
-          await _showAddToMealPlanSheet(savedRecipe);
+          context.go('/recipe/$recipeId');
         }
       }
     } catch (e) {
@@ -219,6 +220,8 @@ class _AddRecipeSheetState extends ConsumerState<AddRecipeSheet>
     }
   }
 
+  // Kept for an upcoming "add to meal plan" entry point in this screen.
+  // ignore: unused_element
   Future<void> _showAddToMealPlanSheet(Recipe recipe) async {
     if (!mounted) return;
     await showModalBottomSheet(
@@ -231,116 +234,162 @@ class _AddRecipeSheetState extends ConsumerState<AddRecipeSheet>
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.of(context).bg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        children: [
-          // Handle
-          const SizedBox(height: 12),
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: AppColors.of(context).border,
-              borderRadius: BorderRadius.circular(2),
-            ),
+    final colors = AppColors.of(context);
+    return Stack(
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: colors.bg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          const SizedBox(height: 16),
-          // Header
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(_isEditing ? 'Edit Recipe' : 'Add Recipe',
-                    style: AppTextStyles.headingMedium),
-                Row(
+          child: Column(
+            children: [
+              // Handle
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: colors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Header
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    TextButton(
-                      onPressed: _isSaving ? null : _saveRecipe,
-                      child: _isSaving
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppColors.primary),
-                            )
-                          : const Text(
-                              'Save',
-                              style: TextStyle(
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 15),
-                            ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 20),
-                      onPressed: () => Navigator.of(context).pop(),
+                    Text(_isEditing ? 'Edit Recipe' : 'Add Recipe',
+                        style: AppTextStyles.headingMedium),
+                    Row(
+                      children: [
+                        TextButton(
+                          onPressed: _isSaving ? null : _saveRecipe,
+                          child: _isSaving
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.primary),
+                                )
+                              : const Text(
+                                  'Save',
+                                  style: TextStyle(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 15),
+                                ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 20),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          // Tab bar
-          TabBar(
-            controller: _tabController,
-            labelColor: AppColors.primary,
-            unselectedLabelColor: AppColors.of(context).textSecondary,
-            indicatorColor: AppColors.primary,
-            tabs: const [
-              Tab(text: 'Paste Link'),
-              Tab(text: 'Manual Entry'),
+              ),
+              // Tab bar
+              TabBar(
+                controller: _tabController,
+                labelColor: AppColors.primary,
+                unselectedLabelColor: colors.textSecondary,
+                indicatorColor: AppColors.primary,
+                tabs: const [
+                  Tab(text: 'Paste Link'),
+                  Tab(text: 'Manual Entry'),
+                ],
+              ),
+              // Tab content
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _PasteLinkTab(
+                      controller: _urlController,
+                      isExtracting: _isExtracting,
+                      onExtract: _extractRecipe,
+                    ),
+                    _ManualEntryTab(
+                      titleController: _titleController,
+                      descController: _descController,
+                      ingredientController: _ingredientController,
+                      stepController: _stepController,
+                      ingredients: _ingredients,
+                      steps: _steps,
+                      onAddIngredient: () {
+                        final text = _ingredientController.text.trim();
+                        if (text.isNotEmpty) {
+                          setState(() {
+                            _ingredients.add(text);
+                            _ingredientController.clear();
+                          });
+                        }
+                      },
+                      onRemoveIngredient: (i) =>
+                          setState(() => _ingredients.removeAt(i)),
+                      onAddStep: () {
+                        final text = _stepController.text.trim();
+                        if (text.isNotEmpty) {
+                          setState(() {
+                            _steps.add(text);
+                            _stepController.clear();
+                          });
+                        }
+                      },
+                      onRemoveStep: (i) => setState(() => _steps.removeAt(i)),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
-          // Tab content
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _PasteLinkTab(
-                  controller: _urlController,
-                  isExtracting: _isExtracting,
-                  onExtract: _extractRecipe,
+        ),
+
+        // ── Saving overlay ─────────────────────────────────────────────────
+        if (_isSaving)
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              child: Container(
+                color: colors.bg.withValues(alpha: 0.93),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // App icon
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.asset(
+                        'assets/images/play_store_512.png',
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
+                        strokeWidth: 2.5,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Saving recipe…',
+                      style: AppTextStyles.labelLarge
+                          .copyWith(color: colors.textSecondary),
+                    ),
+                  ],
                 ),
-                _ManualEntryTab(
-                  titleController: _titleController,
-                  descController: _descController,
-                  ingredientController: _ingredientController,
-                  stepController: _stepController,
-                  ingredients: _ingredients,
-                  steps: _steps,
-                  onAddIngredient: () {
-                    final text = _ingredientController.text.trim();
-                    if (text.isNotEmpty) {
-                      setState(() {
-                        _ingredients.add(text);
-                        _ingredientController.clear();
-                      });
-                    }
-                  },
-                  onRemoveIngredient: (i) =>
-                      setState(() => _ingredients.removeAt(i)),
-                  onAddStep: () {
-                    final text = _stepController.text.trim();
-                    if (text.isNotEmpty) {
-                      setState(() {
-                        _steps.add(text);
-                        _stepController.clear();
-                      });
-                    }
-                  },
-                  onRemoveStep: (i) => setState(() => _steps.removeAt(i)),
-                ),
-              ],
+              ),
             ),
           ),
-        ],
-      ),
+      ],
     );
   }
 }
@@ -671,7 +720,7 @@ class _AddToMealPlanSheetState extends State<_AddToMealPlanSheet> {
       final weekStart = _weekStartOf(_selectedDate);
       final dateKey = _selectedDate.toIso8601String().split('T').first;
 
-      final existing = await SupabaseService.getMealPlanForWeek(weekStart);
+      final existing = await FirebaseService.getMealPlanForWeek(weekStart);
 
       final slotsMap = Map<String, Map<String, MealSlot>>.from(
         (existing?.slots ?? {}).map(
@@ -688,12 +737,12 @@ class _AddToMealPlanSheetState extends State<_AddToMealPlanSheet> {
       final plan = MealPlan(
         id: existing?.id ??
             DateTime.now().millisecondsSinceEpoch.toString(),
-        userId: SupabaseService.currentUser?.id ?? '',
+        userId: FirebaseService.currentUserId ?? '',
         weekStart: weekStart,
         slots: slotsMap,
       );
 
-      await SupabaseService.saveMealPlan(plan);
+      await FirebaseService.saveMealPlan(plan);
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(

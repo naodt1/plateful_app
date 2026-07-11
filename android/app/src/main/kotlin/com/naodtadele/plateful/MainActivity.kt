@@ -1,4 +1,4 @@
-package com.plateful.plateful
+package com.naodtadele.plateful
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 

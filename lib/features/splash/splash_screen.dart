@@ -2,10 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/services/firebase_service.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/share/pending_share.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -67,9 +68,14 @@ class _SplashScreenState extends State<SplashScreen>
 
   void _navigate() {
     if (!mounted) return;
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user != null) {
+    if (FirebaseService.currentUserId != null) {
       context.go('/home');
+      // If the app was cold-started from a share, route to the import flow now
+      // that home is in place — pushing earlier would have been clobbered here.
+      final sharedUrl = PendingShare.take();
+      if (sharedUrl != null) {
+        context.push('/recipe/import', extra: {'url': sharedUrl});
+      }
     } else {
       context.go('/onboarding');
     }
@@ -139,7 +145,7 @@ class _SplashScreenState extends State<SplashScreen>
                 child: Text(
                   'Your kitchen, your recipes',
                   style: AppTextStyles.bodyLarge.copyWith(
-                    color: Colors.white.withOpacity(0.78),
+                    color: Colors.white.withValues(alpha: 0.78),
                     letterSpacing: 0.2,
                   ),
                 ),

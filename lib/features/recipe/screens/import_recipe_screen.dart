@@ -9,7 +9,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/providers/recipe_providers.dart';
 import '../../../core/services/claude_service.dart';
 import '../../subscription/pro_gate.dart';
-import '../../../core/services/supabase_service.dart';
+import '../../../core/services/firebase_service.dart';
 import '../../../core/widgets/skeleton_loader.dart';
 import '../../../models/recipe.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -66,7 +66,7 @@ class _ImportRecipeScreenState extends ConsumerState<ImportRecipeScreen> {
       final data = await ClaudeService.extractRecipeFromUrl(url);
       await ProGate.recordImport();
 
-      final userId = SupabaseService.currentUser?.id ?? '';
+      final userId = FirebaseService.currentUserId ?? '';
       final ingList = (data['ingredients'] as List? ?? []).map((e) {
         final m = e as Map<String, dynamic>;
         return Ingredient(
@@ -97,7 +97,7 @@ class _ImportRecipeScreenState extends ConsumerState<ImportRecipeScreen> {
         servings: (data['servings'] as num?)?.toInt() ?? 4,
       );
 
-      final recipeId = await SupabaseService.saveRecipe(recipe);
+      final recipeId = await FirebaseService.saveRecipe(recipe);
       refreshRecipeData(ref); // refresh home screen
       if (mounted) {
         setState(() {

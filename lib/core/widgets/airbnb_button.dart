@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 
 class AirbnbButton extends StatelessWidget {
@@ -26,11 +27,18 @@ class AirbnbButton extends StatelessWidget {
     final bgColor = backgroundColor ?? (isOutlined ? Colors.transparent : AppColors.primary);
     final fgColor = foregroundColor ?? (isOutlined ? AppColors.primary : Colors.white);
 
+    final tap = (isLoading || onPressed == null)
+        ? null
+        : () {
+            HapticFeedback.lightImpact();
+            onPressed!();
+          };
+
     return SizedBox(
       width: double.infinity,
       height: 52,
       child: ElevatedButton(
-        onPressed: isLoading ? null : onPressed,
+        onPressed: tap,
         style: ElevatedButton.styleFrom(
           backgroundColor: bgColor,
           foregroundColor: fgColor,
