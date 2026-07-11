@@ -269,9 +269,40 @@ Rules:
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
+// ── Per-IP rate limiting (in-memory, per isolate) ─────────────────────
+const RATE_LIMIT_MAX = 8;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const _rlHits = new Map<string, { count: number; reset: number }>();
+function clientIp(req: Request): string {
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) return xff.split(",")[0].trim();
+  return req.headers.get("x-real-ip") ?? "unknown";
+}
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  if (_rlHits.size > 5000) {
+    for (const [k, v] of _rlHits) if (now > v.reset) _rlHits.delete(k);
+  }
+  const e = _rlHits.get(ip);
+  if (!e || now > e.reset) {
+    _rlHits.set(ip, { count: 1, reset: now + RATE_LIMIT_WINDOW_MS });
+    return false;
+  }
+  e.count++;
+  return e.count > RATE_LIMIT_MAX;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
+  }
+
+  const _ip = clientIp(req);
+  if (isRateLimited(_ip)) {
+    return new Response(JSON.stringify({ error: "rate limited, slow down" }), {
+      status: 429,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   const APP_SECRET = Deno.env.get("PLATEFUL_APP_SECRET") ?? "";
