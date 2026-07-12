@@ -7,6 +7,7 @@ import '../../../core/services/firebase_service.dart';
 import '../../../core/widgets/skeleton_loader.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../models/collection.dart';
+import '../../../core/utils/error_messages.dart';
 
 final _collectionsDetailProvider = FutureProvider.autoDispose<List<Collection>>((ref) {
   return FirebaseService.getCollections();
@@ -82,7 +83,7 @@ class CollectionsScreen extends ConsumerWidget {
           ),
         ),
         error: (e, _) => Center(
-          child: Text('Error: $e', style: AppTextStyles.bodySmall),
+          child: Text(friendlyError(e), style: AppTextStyles.bodySmall),
         ),
       ),
       floatingActionButton: FloatingActionButton(

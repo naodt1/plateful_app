@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/services/claude_service.dart';
 import '../../../core/widgets/skeleton_loader.dart';
+import '../../../core/utils/error_messages.dart';
 
 class PantrySuggestionsSheet extends StatefulWidget {
   final List<String> pantryItems;
@@ -35,7 +36,7 @@ class _PantrySuggestionsSheetState extends State<PantrySuggestionsSheet> {
       });
     } catch (e) {
       setState(() {
-        _error = e.toString();
+        _error = friendlyError(e);
         _isLoading = false;
       });
     }
@@ -115,7 +116,7 @@ class _PantrySuggestionsSheetState extends State<PantrySuggestionsSheet> {
                       ),
                     )
                   else if (_error != null)
-                    Text('Error: $_error',
+                    Text(_error ?? 'Something went wrong. Please try again.',
                         style: const TextStyle(color: AppColors.error))
                   else if (_suggestions.isEmpty)
                     Text(

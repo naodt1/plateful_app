@@ -44,7 +44,8 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       if (mounted) context.go('/home');
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error =
+          FirebaseService.authErrorMessage(e) ?? 'Something went wrong. Please try again.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -56,10 +57,9 @@ class _LoginScreenState extends State<LoginScreen> {
       await FirebaseService.signInWithGoogle();
       if (mounted) context.go('/home');
     } catch (e) {
-      // Swallow silent cancellation — user tapped the back button on the picker.
-      if (!e.toString().contains('cancelled')) {
-        setState(() => _error = e.toString());
-      }
+      // Show a friendly message; stay silent if the user just cancelled.
+      final msg = FirebaseService.authErrorMessage(e);
+      if (msg != null) setState(() => _error = msg);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

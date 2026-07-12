@@ -8,6 +8,7 @@ import '../../../core/widgets/skeleton_loader.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../models/recipe.dart';
 import '../../../core/widgets/confirm_dialog.dart';
+import '../../../core/utils/error_messages.dart';
 
 final _collectionRecipesProvider =
     FutureProvider.autoDispose.family<List<Recipe>, String>((ref, id) {
@@ -147,7 +148,7 @@ class CollectionDetailScreen extends ConsumerWidget {
               borderRadius: 16),
         ),
         error: (e, _) => Center(
-            child: Text('Error: $e', style: AppTextStyles.bodySmall)),
+            child: Text(friendlyError(e), style: AppTextStyles.bodySmall)),
       ),
     );
   }

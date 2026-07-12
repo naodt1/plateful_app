@@ -258,7 +258,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           itemBuilder: (_, __) => const SkeletonRecipeCard(),
                         ),
                         error: (e, _) => Center(
-                          child: Text('Error loading recipes',
+                          child: Text('Couldn\'t load your recipes.',
                               style: AppTextStyles.bodySmall),
                         ),
                       ),

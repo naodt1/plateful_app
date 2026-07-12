@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 import '../../core/services/revenuecat_service.dart';
+import '../../core/utils/error_messages.dart';
 
 /// Presents the RevenueCat-hosted Paywall (configured in the dashboard).
 ///
@@ -41,7 +42,7 @@ class PlatefulPaywall {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open paywall: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
       return svc.isPro;
@@ -63,7 +64,7 @@ class PlatefulPaywall {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open paywall: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
       return svc.isPro;

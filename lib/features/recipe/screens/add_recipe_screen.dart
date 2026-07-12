@@ -13,6 +13,7 @@ import '../../../models/recipe.dart';
 import '../../../models/meal_plan.dart';
 import 'package:go_router/go_router.dart';
 import '../../subscription/pro_gate.dart';
+import '../../../core/utils/error_messages.dart';
 
 // Full-page screen kept for deep-link / share-sheet entry
 class AddRecipeScreen extends StatelessWidget {
@@ -136,7 +137,7 @@ class _AddRecipeSheetState extends ConsumerState<AddRecipeSheet>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+            .showSnackBar(SnackBar(content: Text(friendlyError(e))));
       }
     } finally {
       if (mounted) setState(() => _isExtracting = false);
@@ -213,7 +214,7 @@ class _AddRecipeSheetState extends ConsumerState<AddRecipeSheet>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error saving: $e')));
+            .showSnackBar(SnackBar(content: Text(friendlyError(e))));
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -755,7 +756,7 @@ class _AddToMealPlanSheetState extends State<_AddToMealPlanSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+            .showSnackBar(SnackBar(content: Text(friendlyError(e))));
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);

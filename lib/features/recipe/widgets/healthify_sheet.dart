@@ -5,6 +5,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/services/claude_service.dart';
 import '../../../core/widgets/skeleton_loader.dart';
 import '../../../models/recipe.dart';
+import '../../../core/utils/error_messages.dart';
 
 class HealthifySheet extends StatefulWidget {
   final Recipe recipe;
@@ -35,7 +36,7 @@ class _HealthifySheetState extends State<HealthifySheet> {
       });
     } catch (e) {
       setState(() {
-        _error = e.toString();
+        _error = friendlyError(e);
         _isLoading = false;
       });
     }
@@ -94,7 +95,7 @@ class _HealthifySheetState extends State<HealthifySheet> {
                   if (_isLoading) ...[
                     _HealthifySkeleton(),
                   ] else if (_error != null) ...[
-                    Text('Error: $_error',
+                    Text(_error ?? 'Something went wrong. Please try again.',
                         style: const TextStyle(color: AppColors.error)),
                   ] else if (_result != null) ...[
                     _HealthifyResults(result: _result!),

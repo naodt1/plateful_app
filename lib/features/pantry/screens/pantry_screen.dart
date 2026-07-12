@@ -8,6 +8,7 @@ import '../../../core/widgets/skeleton_loader.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../models/pantry_item.dart';
 import '../widgets/pantry_suggestions_sheet.dart';
+import '../../../core/utils/error_messages.dart';
 
 final _pantryProvider =
     FutureProvider.autoDispose<List<PantryItem>>((ref) {
@@ -388,7 +389,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
                 ),
               ),
               error: (e, _) => Center(
-                  child: Text('Error: $e',
+                  child: Text(friendlyError(e),
                       style: AppTextStyles.bodySmall)),
             ),
           ),

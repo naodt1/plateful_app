@@ -113,6 +113,45 @@ class FirebaseService {
   static Future<void> resetPassword(String email) =>
       _auth.sendPasswordResetEmail(email: email);
 
+  /// Turn an auth error into a short, human-friendly message. Returns null when
+  /// the user simply cancelled (nothing to show).
+  static String? authErrorMessage(Object e) {
+    if (e is FirebaseAuthException) {
+      switch (e.code) {
+        case 'canceled':
+        case 'web-context-canceled':
+          return null; // user backed out of the flow
+        case 'invalid-credential':
+        case 'wrong-password':
+        case 'user-not-found':
+          return 'Incorrect email or password. Please try again.';
+        case 'invalid-email':
+          return 'That email address doesn\'t look right.';
+        case 'user-disabled':
+          return 'This account has been disabled. Contact support if that\'s a mistake.';
+        case 'email-already-in-use':
+          return 'An account with this email already exists — try signing in instead.';
+        case 'weak-password':
+          return 'Please pick a stronger password (at least 6 characters).';
+        case 'network-request-failed':
+          return 'No connection. Check your internet and try again.';
+        case 'too-many-requests':
+          return 'Too many attempts. Please wait a moment and try again.';
+        case 'operation-not-allowed':
+          return 'This sign-in method isn\'t available right now.';
+        case 'account-exists-with-different-credential':
+          return 'This email is already registered with a different sign-in method.';
+        case 'missing-config':
+        case 'no-id-token':
+          return 'Google sign-in isn\'t available right now. Try email instead.';
+        default:
+          return 'Something went wrong. Please try again.';
+      }
+    }
+    if (e.toString().toLowerCase().contains('cancel')) return null;
+    return 'Something went wrong. Please try again.';
+  }
+
   static Future<void> signOut() async {
     try {
       await GoogleSignIn.instance.signOut();
@@ -225,6 +264,12 @@ class FirebaseService {
         'recipe_ids': FieldValue.arrayRemove([id])
       });
     }
+  }
+
+  /// Set a recipe's favorite flag.
+  static Future<void> setFavorite(String recipeId, bool value) async {
+    if (currentUserId == null) return;
+    await _col('recipes').doc(recipeId).update({'favorite': value});
   }
 
   // ─── Collections ───────────────────────────────────────────────────────────

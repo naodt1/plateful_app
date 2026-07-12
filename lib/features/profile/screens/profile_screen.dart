@@ -13,6 +13,7 @@ import '../../../core/providers/theme_provider.dart';
 import '../../../core/providers/subscription_provider.dart';
 import '../../subscription/paywall.dart';
 import '../../../core/widgets/confirm_dialog.dart';
+import '../../../core/utils/error_messages.dart';
 
 final _profileDetailProvider =
     FutureProvider.autoDispose<Map<String, dynamic>?>((ref) {
@@ -263,7 +264,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open subscription manager: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
     }
@@ -419,7 +420,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       if (mounted) {
         Navigator.of(context).pop(); // close spinner
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not delete account: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
     }
@@ -466,7 +467,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       body: profileAsync.when(
         loading: () => const _ProfileSkeleton(),
         error: (e, _) =>
-            Center(child: Text('Error: $e', style: AppTextStyles.bodySmall)),
+            Center(child: Text(friendlyError(e), style: AppTextStyles.bodySmall)),
         data: (profile) {
           final name = profile?['display_name'] as String? ?? 'Chef';
           final email = user?.email ?? '';
@@ -933,7 +934,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
     } finally {
@@ -1072,7 +1073,7 @@ class _PrivacySecuritySheetState extends State<_PrivacySecuritySheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
     } finally {

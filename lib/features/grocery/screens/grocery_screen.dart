@@ -9,6 +9,7 @@ import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../models/grocery_item.dart';
 import '../widgets/grocery_item_tile.dart';
+import '../../../core/utils/error_messages.dart';
 
 final _groceryProvider =
     FutureProvider.autoDispose<List<GroceryItem>>((ref) {
@@ -339,7 +340,7 @@ class _GroceryScreenState extends ConsumerState<GroceryScreen> {
           ),
         ),
         error: (e, _) => Center(
-          child: Text('Error: $e', style: AppTextStyles.bodySmall),
+          child: Text(friendlyError(e), style: AppTextStyles.bodySmall),
         ),
       ),
       floatingActionButton: FloatingActionButton(

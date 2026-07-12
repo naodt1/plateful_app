@@ -44,7 +44,8 @@ class _SignupScreenState extends State<SignupScreen> {
       // Account created and signed in — go straight into the app.
       if (mounted) context.go('/home');
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error =
+          FirebaseService.authErrorMessage(e) ?? 'Something went wrong. Please try again.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -56,7 +57,9 @@ class _SignupScreenState extends State<SignupScreen> {
       await FirebaseService.signInWithGoogle();
       if (mounted) context.go('/home');
     } catch (e) {
-      setState(() => _error = e.toString());
+      // Show a friendly message; stay silent if the user just cancelled.
+      final msg = FirebaseService.authErrorMessage(e);
+      if (msg != null) setState(() => _error = msg);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

@@ -11,6 +11,7 @@ import '../../../models/recipe.dart';
 import '../widgets/week_calendar.dart';
 import '../widgets/meal_slot_card.dart';
 import '../../subscription/pro_gate.dart';
+import '../../../core/utils/error_messages.dart';
 
 DateTime _getWeekStart(DateTime date) {
   final weekday = date.weekday;
@@ -107,7 +108,7 @@ class _MealPlanScreenState extends ConsumerState<MealPlanScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error generating plan: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
     } finally {
@@ -155,7 +156,7 @@ class _MealPlanScreenState extends ConsumerState<MealPlanScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not save: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
     }
@@ -391,7 +392,7 @@ class _MealPlanScreenState extends ConsumerState<MealPlanScreen> {
                 ),
               ),
               error: (e, _) => Center(
-                child: Text('Error loading plan',
+                child: Text('Couldn\'t load your meal plan.',
                     style: AppTextStyles.bodySmall),
               ),
             ),
