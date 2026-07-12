@@ -292,6 +292,46 @@ function isRateLimited(ip: string): boolean {
   return e.count > RATE_LIMIT_MAX;
 }
 
+// ── YouTube: normalize Shorts/short-links and pull the video description ───────
+function normalizeYouTubeUrl(url: string): string {
+  const shorts = url.match(/youtube\.com\/shorts\/([A-Za-z0-9_-]{6,})/);
+  if (shorts) return `https://www.youtube.com/watch?v=${shorts[1]}`;
+  const be = url.match(/youtu\.be\/([A-Za-z0-9_-]{6,})/);
+  if (be) return `https://www.youtube.com/watch?v=${be[1]}`;
+  return url;
+}
+
+function unescapeJson(s: string): string {
+  try {
+    return JSON.parse(`"${s}"`);
+  } catch {
+    return s.replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\u0026/g, "&");
+  }
+}
+
+// Shorts pages return empty on a direct fetch, but the /watch page carries the
+// full description in ytInitialData ("shortDescription") — that's the recipe.
+async function scrapeYouTube(
+  url: string,
+): Promise<{ content: string; imageUrl: string | null }> {
+  const watch = normalizeYouTubeUrl(url);
+  const res = await fetch(watch, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Accept-Language": "en-US,en;q=0.9",
+    },
+  });
+  if (!res.ok) return { content: "", imageUrl: null };
+  const html = await res.text();
+  const descMatch = html.match(/"shortDescription":"((?:[^"\\]|\\.)*)"/);
+  const content = descMatch
+    ? `Video description:\n${unescapeJson(descMatch[1])}\n`
+    : "";
+  const thumb = html.match(/<meta property="og:image" content="([^"]+)"/);
+  return { content, imageUrl: thumb ? thumb[1] : null };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -336,6 +376,15 @@ Deno.serve(async (req) => {
         imageUrl = r.imageUrl;
       } catch (e) {
         console.error("oEmbed failed:", e);
+      }
+    }
+    if (source === "youtube") {
+      try {
+        const yt = await scrapeYouTube(url);
+        if (yt.content) content += `\n${yt.content}`;
+        imageUrl = imageUrl ?? yt.imageUrl;
+      } catch (e) {
+        console.error("YouTube scrape failed:", e);
       }
     }
 
