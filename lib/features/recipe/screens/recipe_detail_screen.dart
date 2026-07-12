@@ -25,6 +25,7 @@ import '../widgets/servings_adjuster.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../subscription/pro_gate.dart';
 import '../../../core/providers/subscription_provider.dart';
+import '../../../core/utils/error_messages.dart';
 
 class RecipeDetailScreen extends ConsumerStatefulWidget {
   final String recipeId;
@@ -111,6 +112,23 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
     return recipe.ingredients
         .map((i) => i.copyWith(amount: i.amount * scale))
         .toList();
+  }
+
+  Future<void> _toggleFavorite() async {
+    final r = _recipe;
+    if (r == null) return;
+    final next = !r.favorite;
+    setState(() => _recipe = r.copyWith(favorite: next));
+    try {
+      await FirebaseService.setFavorite(r.id, next);
+      refreshRecipeData(ref);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _recipe = r); // revert on failure
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(friendlyError(e))));
+      }
+    }
   }
 
   Future<void> _showHealthifySheet() async {
@@ -257,7 +275,7 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error deleting: $e')));
+            .showSnackBar(SnackBar(content: Text(friendlyError(e))));
       }
     }
   }
@@ -298,6 +316,29 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
               ),
             ),
             actions: [
+              if (_recipe != null)
+                Container(
+                  margin: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    tooltip: _recipe!.favorite
+                        ? 'Remove from Favorites'
+                        : 'Add to Favorites',
+                    icon: Icon(
+                      _recipe!.favorite
+                          ? Icons.favorite
+                          : Icons.favorite_border,
+                      color: _recipe!.favorite
+                          ? const Color(0xFFE5533D)
+                          : Colors.white,
+                      size: 20,
+                    ),
+                    onPressed: _toggleFavorite,
+                  ),
+                ),
               Container(
                 margin: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -630,7 +671,16 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
 
                   // ── Nutrition ──────────────────────────────────────────────
                   if (recipe.nutrition != null) ...[
-                    _SectionHeader(label: 'Nutrition', colors: colors),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        children: [
+                          Text('Macros', style: AppTextStyles.headingMedium),
+                          const SizedBox(width: 7),
+                          _MacroInfoButton(colors: colors),
+                        ],
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -858,6 +908,156 @@ class _SectionHeader extends StatelessWidget {
           if (trailing != null) trailing!,
         ],
       ),
+    );
+  }
+}
+
+/// Small "?" beside the Macros title that explains where the numbers come from.
+class _MacroInfoButton extends StatelessWidget {
+  final AppColorScheme colors;
+  const _MacroInfoButton({required this.colors});
+
+  void _show(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: BoxDecoration(
+          color: colors.bg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: EdgeInsets.fromLTRB(
+            24, 16, 24, MediaQuery.of(context).padding.bottom + 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: colors.border,
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text('Where these macros come from',
+                style: AppTextStyles.headingMedium),
+            const SizedBox(height: 16),
+            _MacroInfoLine(
+              icon: Icons.menu_book_rounded,
+              title: 'From the recipe',
+              body:
+                  'If the original recipe lists nutrition, Plateful uses those numbers as-is.',
+              colors: colors,
+            ),
+            const SizedBox(height: 14),
+            _MacroInfoLine(
+              icon: Icons.auto_awesome_rounded,
+              title: 'AI-estimated',
+              body:
+                  'If it doesn\'t, Plateful\'s AI estimates the macros from the ingredients and serving size.',
+              colors: colors,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Either way, treat them as a close approximation — not a lab measurement.',
+              style: AppTextStyles.bodySmall
+                  .copyWith(color: colors.textSecondary),
+            ),
+            const SizedBox(height: 22),
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                alignment: Alignment.center,
+                child: const Text('Got it',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _show(context),
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: 18,
+        height: 18,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: colors.textSecondary, width: 1.4),
+        ),
+        child: Text('?',
+            style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: colors.textSecondary,
+                height: 1.0)),
+      ),
+    );
+  }
+}
+
+class _MacroInfoLine extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String body;
+  final AppColorScheme colors;
+
+  const _MacroInfoLine({
+    required this.icon,
+    required this.title,
+    required this.body,
+    required this.colors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 19, color: AppColors.primary),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                      fontWeight: FontWeight.w700, color: colors.textPrimary)),
+              const SizedBox(height: 2),
+              Text(body,
+                  style: AppTextStyles.bodySmall
+                      .copyWith(color: colors.textSecondary, height: 1.35)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1253,7 +1453,7 @@ class _MealPlanPickerSheetState extends State<_MealPlanPickerSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+            .showSnackBar(SnackBar(content: Text(friendlyError(e))));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -1327,7 +1527,7 @@ class _TailorSheetState extends State<TailorSheet> {
         _hasResult = true;
       });
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = friendlyError(e));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -1500,7 +1700,7 @@ class _TailorSheetState extends State<TailorSheet> {
                       if (_error != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 12),
-                          child: Text('Error: $_error',
+                          child: Text(_error ?? 'Something went wrong. Please try again.',
                               style: const TextStyle(color: AppColors.error)),
                         ),
                     ],
@@ -2210,7 +2410,7 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
         else _alreadyIn.remove(col.id);
       });
       if (mounted) ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error: $e')));
+          .showSnackBar(SnackBar(content: Text(friendlyError(e))));
     }
   }
 

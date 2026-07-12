@@ -48,13 +48,19 @@ class _RecipeCardState extends State<RecipeCard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            ClipRRect(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(16)),
-              child: Hero(
-                tag: 'recipe-image-${recipe.id}',
-                child: _RecipeImage(imageUrl: recipe.imageUrl),
-              ),
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(16)),
+                  child: Hero(
+                    tag: 'recipe-image-${recipe.id}',
+                    child: _RecipeImage(imageUrl: recipe.imageUrl),
+                  ),
+                ),
+                if (recipe.favorite)
+                  const Positioned(top: 8, right: 8, child: FavoriteHeart()),
+              ],
             ),
             Expanded(
               child: Padding(
@@ -256,6 +262,10 @@ class RecipeListCard extends StatelessWidget {
                 ],
               ),
             ),
+            if (recipe.favorite) ...[
+              const Icon(Icons.favorite, size: 15, color: Color(0xFFE5533D)),
+              const SizedBox(width: 8),
+            ],
             Icon(
               Icons.arrow_forward_ios,
               size: 14,
@@ -264,6 +274,27 @@ class RecipeListCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// A filled heart badge shown on favorited recipe images.
+class FavoriteHeart extends StatelessWidget {
+  final double size;
+  const FavoriteHeart({super.key, this.size = 26});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.35),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(Icons.favorite,
+          size: size * 0.56, color: const Color(0xFFE5533D)),
     );
   }
 }

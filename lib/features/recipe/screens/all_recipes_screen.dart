@@ -9,6 +9,7 @@ import '../../../core/providers/recipe_providers.dart';
 import '../../../core/widgets/skeleton_loader.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../models/recipe.dart';
+import '../../../core/utils/error_messages.dart';
 
 enum _DateFilter { all, today, week, month }
 
@@ -33,6 +34,7 @@ class _AllRecipesScreenState extends ConsumerState<AllRecipesScreen> {
   String _query = '';
   _DateFilter _dateFilter = _DateFilter.all;
   bool _newestFirst = true;
+  bool _favoritesOnly = false;
 
   @override
   void dispose() {
@@ -59,6 +61,7 @@ class _AllRecipesScreenState extends ConsumerState<AllRecipesScreen> {
   List<Recipe> _filter(List<Recipe> recipes) {
     final q = _query.trim().toLowerCase();
     var list = recipes.where((r) {
+      if (_favoritesOnly && !r.favorite) return false;
       if (!_matchesDate(r.createdAt)) return false;
       if (q.isEmpty) return true;
       return r.title.toLowerCase().contains(q) ||
@@ -82,6 +85,17 @@ class _AllRecipesScreenState extends ConsumerState<AllRecipesScreen> {
         backgroundColor: colors.bg,
         title: Text('All Recipes', style: AppTextStyles.headingMedium),
         actions: [
+          IconButton(
+            tooltip: _favoritesOnly ? 'Showing favorites' : 'Show favorites',
+            icon: Icon(
+              _favoritesOnly ? Icons.favorite : Icons.favorite_border,
+              color:
+                  _favoritesOnly ? const Color(0xFFE5533D) : colors.textPrimary,
+              size: 20,
+            ),
+            onPressed: () =>
+                setState(() => _favoritesOnly = !_favoritesOnly),
+          ),
           IconButton(
             tooltip: _newestFirst ? 'Newest first' : 'Oldest first',
             icon: Icon(
@@ -189,7 +203,7 @@ class _AllRecipesScreenState extends ConsumerState<AllRecipesScreen> {
                 ),
               ),
               error: (e, _) => Center(
-                  child: Text('Error: $e', style: AppTextStyles.bodySmall)),
+                  child: Text(friendlyError(e), style: AppTextStyles.bodySmall)),
               data: (recipes) {
                 final filtered = _filter(recipes);
 
@@ -208,7 +222,9 @@ class _AllRecipesScreenState extends ConsumerState<AllRecipesScreen> {
                     title: 'No matches',
                     subtitle: _query.isNotEmpty
                         ? 'No recipes match "$_query".'
-                        : 'No recipes in this time range.',
+                        : _favoritesOnly
+                            ? 'No favorites yet — tap the heart on a recipe.'
+                            : 'No recipes in this time range.',
                   );
                 }
 
@@ -337,6 +353,10 @@ class _RecipeRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
+            if (recipe.favorite) ...[
+              const Icon(Icons.favorite, size: 15, color: Color(0xFFE5533D)),
+              const SizedBox(width: 6),
+            ],
             Icon(Icons.chevron_right, color: colors.textSecondary, size: 18),
           ],
         ),

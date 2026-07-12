@@ -13,6 +13,8 @@ import '../../../core/services/firebase_service.dart';
 import '../../../core/widgets/skeleton_loader.dart';
 import '../../../models/recipe.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/utils/error_messages.dart';
+import '../widgets/collection_picker_sheet.dart';
 
 /// Screen shown when a link is shared into the app from another app
 /// (Instagram, TikTok, YouTube, browser…). It extracts the recipe with AI,
@@ -116,7 +118,7 @@ class _ImportRecipeScreenState extends ConsumerState<ImportRecipeScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = friendlyError(e);
           _loading = false;
         });
       }
@@ -559,6 +561,20 @@ class _SuccessView extends StatelessWidget {
                   ],
                 ),
               ],
+            ),
+          ),
+        ),
+
+        // Optional, skippable nudge to organize the recipe into a collection.
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: TextButton.icon(
+              onPressed: () => showCollectionPicker(context, recipe.id),
+              icon: const Icon(Icons.collections_bookmark_outlined, size: 18),
+              label: const Text('Add to a collection'),
+              style: TextButton.styleFrom(foregroundColor: AppColors.primary),
             ),
           ),
         ),

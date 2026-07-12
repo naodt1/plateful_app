@@ -67,6 +67,7 @@ class Recipe {
   final List<String> tags;
   final DateTime createdAt;
   final int servings;
+  final bool favorite;
 
   const Recipe({
     required this.id,
@@ -82,6 +83,7 @@ class Recipe {
     required this.tags,
     required this.createdAt,
     this.servings = 4,
+    this.favorite = false,
   });
 
   factory Recipe.fromJson(Map<String, dynamic> json) {
@@ -127,6 +129,7 @@ class Recipe {
           ? DateTime.parse(json['created_at'] as String)
           : DateTime.now(),
       servings: (json['servings'] as num?)?.toInt() ?? 4,
+      favorite: json['favorite'] as bool? ?? false,
     );
   }
 
@@ -144,6 +147,7 @@ class Recipe {
         'tags': tags,
         'created_at': createdAt.toIso8601String(),
         'servings': servings,
+        'favorite': favorite,
       };
 
   Recipe copyWith({
@@ -156,6 +160,7 @@ class Recipe {
     Nutrition? nutrition,
     List<String>? tags,
     int? servings,
+    bool? favorite,
   }) =>
       Recipe(
         id: id ?? this.id,
@@ -171,5 +176,6 @@ class Recipe {
         tags: tags ?? this.tags,
         createdAt: createdAt,
         servings: servings ?? this.servings,
+        favorite: favorite ?? this.favorite,
       );
 }
