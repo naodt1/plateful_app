@@ -16,11 +16,11 @@ class MainShell extends StatelessWidget {
   }
 
   static const _items = [
-    (Icons.home_outlined, Icons.home_rounded, 'Home', '/home'),
-    (Icons.kitchen_outlined, Icons.kitchen_rounded, 'Pantry', '/pantry'),
-    (Icons.calendar_today_outlined, Icons.calendar_today_rounded, 'Plan', '/meal-plan'),
-    (Icons.shopping_cart_outlined, Icons.shopping_cart_rounded, 'Grocery', '/grocery'),
-    (Icons.person_outline, Icons.person_rounded, 'Profile', '/profile'),
+    (Icons.cottage_outlined, Icons.cottage_rounded, 'Home', '/home'),
+    (Icons.inventory_2_outlined, Icons.inventory_2_rounded, 'Pantry', '/pantry'),
+    (Icons.calendar_month_outlined, Icons.calendar_month_rounded, 'Plan', '/meal-plan'),
+    (Icons.shopping_basket_outlined, Icons.shopping_basket_rounded, 'Grocery', '/grocery'),
+    (Icons.account_circle_outlined, Icons.account_circle_rounded, 'Profile', '/profile'),
   ];
 
   @override
@@ -81,8 +81,11 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeColor = AppColors.primary;
-    final inactiveColor = colors.textSecondary;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    const activeColor = AppColors.primary;
+    // Stronger than the muted secondary gray so inactive tabs stay legible.
+    final inactiveColor =
+        isDark ? const Color(0xFFA9AFAC) : const Color(0xFF4B534E);
 
     return Expanded(
       child: GestureDetector(
@@ -120,7 +123,7 @@ class _NavItem extends StatelessWidget {
               duration: const Duration(milliseconds: 220),
               style: TextStyle(
                 fontSize: 11,
-                fontWeight: FontWeight.w600,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
                 color: isActive ? activeColor : inactiveColor,
               ),
               child: Text(label),
