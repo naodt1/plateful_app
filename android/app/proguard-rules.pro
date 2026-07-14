@@ -23,6 +23,22 @@
 -keep class com.revenuecat.purchases.** { *; }
 -dontwarn com.revenuecat.purchases.**
 
+# ─── Firebase (Auth + Firestore) ──────────────────────────────────────────────
+-keep class com.google.firebase.** { *; }
+-dontwarn com.google.firebase.**
+-keep class com.google.firebase.auth.** { *; }
+-keep class com.google.firebase.firestore.** { *; }
+-keep class com.google.firestore.** { *; }
+-dontwarn com.google.firestore.**
+# Firestore transport: gRPC + protobuf (reflection-heavy)
+-keep class io.grpc.** { *; }
+-dontwarn io.grpc.**
+-keep class com.google.protobuf.** { *; }
+-dontwarn com.google.protobuf.**
+# Google Sign-In credential APIs
+-keep class com.google.android.gms.auth.** { *; }
+-dontwarn com.google.android.gms.auth.**
+
 # ─── Google Fonts (network font loading) ─────────────────────────────────────
 -keep class com.google.android.gms.** { *; }
 -dontwarn com.google.android.gms.**
