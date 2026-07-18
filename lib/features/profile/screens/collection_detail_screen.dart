@@ -36,21 +36,28 @@ class CollectionDetailScreen extends ConsumerWidget {
         backgroundColor: colors.bg,
         title: Text(collectionName, style: AppTextStyles.headingMedium),
         actions: [
-          IconButton(
-            icon: Icon(Icons.delete_outline, color: AppColors.error),
-            tooltip: 'Delete collection',
-            onPressed: () => _confirmDelete(context),
-          ),
+          // Favorites is built-in and can't be deleted.
+          if (!FirebaseService.isFavoritesCollection(collectionId))
+            IconButton(
+              icon: Icon(Icons.delete_outline, color: AppColors.error),
+              tooltip: 'Delete collection',
+              onPressed: () => _confirmDelete(context),
+            ),
         ],
       ),
       body: recipesAsync.when(
         data: (recipes) {
           if (recipes.isEmpty) {
+            final isFavorites =
+                FirebaseService.isFavoritesCollection(collectionId);
             return EmptyState(
-              icon: Icons.collections_bookmark_outlined,
-              title: 'Nothing here yet',
-              subtitle:
-                  'Open any recipe and tap ⋯ → "Save to Collection" to add it here.',
+              icon: isFavorites
+                  ? Icons.favorite_border
+                  : Icons.collections_bookmark_outlined,
+              title: isFavorites ? 'No favorites yet' : 'Nothing here yet',
+              subtitle: isFavorites
+                  ? 'Tap the heart on any recipe to add it to Favorites.'
+                  : 'Open any recipe and tap ⋯ → "Save to Collection" to add it here.',
             );
           }
           return GridView.builder(

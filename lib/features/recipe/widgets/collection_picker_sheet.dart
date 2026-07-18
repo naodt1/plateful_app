@@ -159,6 +159,8 @@ class _CollectionPickerSheetState extends State<CollectionPickerSheet> {
                 shrinkWrap: true,
                 children: collections.map((c) {
                   final inCol = _alreadyIn.contains(c.id);
+                  final isFavorites =
+                      FirebaseService.isFavoritesCollection(c.id);
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
                     onTap: () => _toggle(c),
@@ -169,6 +171,10 @@ class _CollectionPickerSheetState extends State<CollectionPickerSheet> {
                     title: Text(c.name,
                         style: AppTextStyles.bodyLarge
                             .copyWith(color: colors.textPrimary)),
+                    trailing: isFavorites
+                        ? const Icon(Icons.favorite,
+                            size: 16, color: Color(0xFFE5533D))
+                        : null,
                   );
                 }).toList(),
               ),

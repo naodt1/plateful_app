@@ -272,6 +272,49 @@ class FirebaseService {
     await _col('recipes').doc(recipeId).update({'favorite': value});
   }
 
+  // ─── Favorites (virtual default collection) ─────────────────────────────────
+  //
+  // "Favorites" is not a stored collection document: it is backed entirely by
+  // the `favorite` flag on recipes, exposed through the collection APIs under
+  // a sentinel id. That keeps the heart button and the collection permanently
+  // in sync, makes Favorites exist for every user by default, and means it can
+  // never be deleted or renamed.
+
+  /// Sentinel id for the built-in Favorites collection.
+  static const String favoritesCollectionId = '_favorites';
+
+  static bool isFavoritesCollection(String id) => id == favoritesCollectionId;
+
+  /// All recipes the user has hearted, newest first.
+  static Future<List<Recipe>> getFavoriteRecipes() async {
+    if (currentUserId == null) return [];
+    final snap =
+        await _col('recipes').where('favorite', isEqualTo: true).get();
+    final recipes =
+        snap.docs.map((d) => Recipe.fromJson(_withId(d))).toList();
+    recipes.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return recipes;
+  }
+
+  static Future<Collection> _favoritesAsCollection() async {
+    int count = 0;
+    try {
+      final agg = await _col('recipes')
+          .where('favorite', isEqualTo: true)
+          .count()
+          .get();
+      count = agg.count ?? 0;
+    } catch (_) {
+      // Count is cosmetic; never let it break the collections list.
+    }
+    return Collection.fromJson({
+      'id': favoritesCollectionId,
+      'user_id': currentUserId,
+      'name': 'Favorites',
+      'recipe_count': count,
+    });
+  }
+
   // ─── Collections ───────────────────────────────────────────────────────────
 
   static Future<List<Collection>> getCollections() async {
@@ -279,13 +322,15 @@ class FirebaseService {
     final snap = await _col('collections')
         .orderBy('created_at', descending: true)
         .get();
-    return snap.docs.map((d) {
+    final stored = snap.docs.map((d) {
       final map = _withId(d);
       // Surface the join count the model expects.
       final ids = (map['recipe_ids'] as List?) ?? const [];
       map['recipe_count'] = ids.length;
       return Collection.fromJson(map);
     }).toList();
+    // Favorites is always present, pinned first.
+    return [await _favoritesAsCollection(), ...stored];
   }
 
   static Future<void> createCollection(String name) async {
@@ -300,6 +345,9 @@ class FirebaseService {
 
   static Future<void> addRecipeToCollection(
       String collectionId, String recipeId) async {
+    if (isFavoritesCollection(collectionId)) {
+      return setFavorite(recipeId, true);
+    }
     await _col('collections').doc(collectionId).update({
       'recipe_ids': FieldValue.arrayUnion([recipeId])
     });
@@ -307,12 +355,16 @@ class FirebaseService {
 
   static Future<void> removeRecipeFromCollection(
       String collectionId, String recipeId) async {
+    if (isFavoritesCollection(collectionId)) {
+      return setFavorite(recipeId, false);
+    }
     await _col('collections').doc(collectionId).update({
       'recipe_ids': FieldValue.arrayRemove([recipeId])
     });
   }
 
   static Future<List<Recipe>> getCollectionRecipes(String collectionId) async {
+    if (isFavoritesCollection(collectionId)) return getFavoriteRecipes();
     final col = await _col('collections').doc(collectionId).get();
     if (!col.exists) return [];
     final ids = ((col.data()?['recipe_ids'] as List?) ?? const [])
@@ -334,10 +386,19 @@ class FirebaseService {
     final snap = await _col('collections')
         .where('recipe_ids', arrayContains: recipeId)
         .get();
-    return snap.docs.map((d) => d.id).toList();
+    final ids = snap.docs.map((d) => d.id).toList();
+    // Include the virtual Favorites collection when the recipe is hearted.
+    try {
+      final recipe = await _col('recipes').doc(recipeId).get();
+      if (recipe.data()?['favorite'] == true) {
+        ids.insert(0, favoritesCollectionId);
+      }
+    } catch (_) {}
+    return ids;
   }
 
   static Future<void> deleteCollection(String collectionId) async {
+    if (isFavoritesCollection(collectionId)) return; // built-in, undeletable
     await _col('collections').doc(collectionId).delete();
   }
 

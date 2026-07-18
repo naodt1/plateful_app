@@ -60,8 +60,15 @@ class CollectionsScreen extends ConsumerWidget {
                       color: AppColors.of(context).surface,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.collections_bookmark,
-                        color: AppColors.primary, size: 20),
+                    child: Icon(
+                      FirebaseService.isFavoritesCollection(col.id)
+                          ? Icons.favorite
+                          : Icons.collections_bookmark,
+                      color: FirebaseService.isFavoritesCollection(col.id)
+                          ? const Color(0xFFE5533D)
+                          : AppColors.primary,
+                      size: 20,
+                    ),
                   ),
                   title: Text(col.name,
                       style: TextStyle(

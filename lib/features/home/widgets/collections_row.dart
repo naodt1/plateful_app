@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/services/firebase_service.dart';
 import '../../../models/collection.dart';
 
 class CollectionsRow extends StatelessWidget {
@@ -48,7 +49,15 @@ class _CollectionCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Icon(Icons.collections_bookmark, color: AppColors.primary, size: 20),
+            Icon(
+              FirebaseService.isFavoritesCollection(collection.id)
+                  ? Icons.favorite
+                  : Icons.collections_bookmark,
+              color: FirebaseService.isFavoritesCollection(collection.id)
+                  ? const Color(0xFFE5533D)
+                  : AppColors.primary,
+              size: 20,
+            ),
             Text(
               collection.name,
               style: const TextStyle(

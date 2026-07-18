@@ -219,15 +219,22 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
     return amount.toStringAsFixed(1);
   }
 
-  void _addToCollection() {
+  Future<void> _addToCollection() async {
     final recipe = _recipe;
     if (recipe == null) return;
-    showModalBottomSheet(
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _AddToCollectionSheet(recipeId: recipe.id),
     );
+    // The sheet may have toggled Favorites (the virtual collection); pull the
+    // fresh flag so the app-bar heart stays in sync.
+    final updated = await FirebaseService.getRecipe(recipe.id);
+    if (mounted && updated != null && updated.favorite != _recipe?.favorite) {
+      setState(() => _recipe = _recipe?.copyWith(favorite: updated.favorite));
+      refreshRecipeData(ref);
+    }
   }
 
   Future<void> _editRecipe() async {
