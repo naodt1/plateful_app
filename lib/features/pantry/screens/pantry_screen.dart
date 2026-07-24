@@ -9,6 +9,7 @@ import '../../../core/widgets/empty_state.dart';
 import '../../../models/pantry_item.dart';
 import '../widgets/pantry_suggestions_sheet.dart';
 import '../../../core/utils/error_messages.dart';
+import '../../../core/widgets/intelligence_mark.dart';
 
 final _pantryProvider =
     FutureProvider.autoDispose<List<PantryItem>>((ref) {
@@ -407,7 +408,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
                     backgroundColor: colors.surface,
                     foregroundColor: AppColors.primary,
                     elevation: 1,
-                    icon: const Icon(Icons.auto_awesome),
+                    icon: const IntelligenceGlyph(size: 20),
                     label: Text(
                       'What can I cook?',
                       style: TextStyle(

@@ -608,9 +608,9 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
   Widget _buildFreeTrialStep() {
     final colors = AppColors.of(context);
     final perks = <Map<String, String>>[
-      {'emoji': '♾️', 'label': 'Unlimited AI recipe imports'},
+      {'emoji': '♾️', 'label': 'Unlimited intelligent recipe imports'},
       {'emoji': '🥑', 'label': 'Healthify and Tailor any recipe'},
-      {'emoji': '🗓️', 'label': 'AI generated weekly meal plans'},
+      {'emoji': '🗓️', 'label': 'Intelligent weekly meal plans'},
       {'emoji': '🛒', 'label': 'Smart auto grocery lists'},
     ];
     return SafeArea(
@@ -870,7 +870,7 @@ class _SetupProgressStepState extends State<_SetupProgressStep> {
           ? 'Saving your taste preferences'
           : 'Applying your ${widget.diet} preferences',
       'Tuning Plateful to $goalText',
-      'Preparing AI recipe import',
+      'Preparing recipe import',
     ];
     _timer = Timer.periodic(const Duration(milliseconds: 750), (t) {
       if (_done < _items.length) {

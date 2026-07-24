@@ -39,10 +39,10 @@ class ClaudeService {
             .timeout(const Duration(seconds: 60));
 
         if (response.statusCode == 429) {
-          throw Exception('AI rate limit reached. Please try again shortly.');
+          throw Exception('Too many requests right now. Please try again shortly.');
         }
         if (response.statusCode != 200) {
-          throw Exception('AI service error (${response.statusCode}).');
+          throw Exception('Recipe service error (${response.statusCode}).');
         }
 
         final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -55,7 +55,7 @@ class ClaudeService {
         await Future.delayed(const Duration(seconds: 2));
       }
     }
-    throw Exception('Unexpected error contacting the AI service.');
+    throw Exception('Unexpected error contacting the recipe service.');
   }
 
   static Map<String, dynamic>? _extractJson(String text) {

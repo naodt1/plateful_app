@@ -85,7 +85,7 @@ class _HealthifySheetState extends State<HealthifySheet> {
                         children: [
                           Text('Healthify Recipe',
                               style: AppTextStyles.headingMedium),
-                          Text('AI-powered suggestions',
+                          Text('Intelligent suggestions',
                               style: AppTextStyles.bodySmall),
                         ],
                       ),

@@ -5,6 +5,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/services/claude_service.dart';
 import '../../../core/widgets/skeleton_loader.dart';
 import '../../../core/utils/error_messages.dart';
+import '../../../core/widgets/intelligence_mark.dart';
 
 class PantrySuggestionsSheet extends StatefulWidget {
   final List<String> pantryItems;
@@ -76,8 +77,7 @@ class _PantrySuggestionsSheetState extends State<PantrySuggestionsSheet> {
                           color: AppColors.of(context).surface,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.auto_awesome,
-                            color: AppColors.primary, size: 22),
+                        child: const IntelligenceGlyph(size: 22),
                       ),
                       const SizedBox(width: 12),
                       Column(

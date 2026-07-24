@@ -221,7 +221,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     .copyWith(color: colors.textSecondary)),
             const SizedBox(height: 12),
             Text(
-              'Your personal AI-powered recipe and meal-planning companion.',
+              'Your personal intelligent recipe and meal-planning companion.',
               textAlign: TextAlign.center,
               style: AppTextStyles.bodyMedium
                   .copyWith(color: colors.textSecondary),
@@ -821,9 +821,9 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
                   child: Divider(height: 1, color: colors.border),
                 ),
                 _NotifTile(
-                  icon: Icons.auto_awesome_outlined,
+                  icon: Icons.soup_kitchen_outlined,
                   title: 'New Recipe Ideas',
-                  subtitle: 'Get AI-generated recipe suggestions',
+                  subtitle: 'Get intelligent recipe suggestions',
                   value: _newRecipes,
                   colors: colors,
                   onChanged: (v) {
@@ -1187,8 +1187,8 @@ const _faqs = [
     'Tap the + button on the Home screen or the Recipe tab. You can create a recipe from scratch, paste a URL to import from a website, or share a link directly from your browser.',
   ),
   (
-    'How do I use the AI recipe generator?',
-    'On the Home screen tap "Generate with AI". Describe the dish, your available ingredients, or any dietary constraints and the AI will produce a full recipe with steps and nutrition info.',
+    'How do I use the recipe generator?',
+    'On the Home screen tap "Generate with Intelligence". Describe the dish, your available ingredients, or any dietary constraints and Plateful will produce a full recipe with steps and nutrition info.',
   ),
   (
     'Can I organise my recipes into folders?',
@@ -1204,7 +1204,7 @@ const _faqs = [
   ),
   (
     'What is Plateful Pro?',
-    'Plateful Pro unlocks unlimited AI recipe generation, advanced meal planning, nutrition insights, and priority support. Tap "Upgrade" on the Profile screen to subscribe.',
+    'Plateful Pro unlocks unlimited intelligent recipe generation, advanced meal planning, nutrition insights, and priority support. Tap "Upgrade" on the Profile screen to subscribe.',
   ),
   (
     'How do I cancel my subscription?',
@@ -1567,7 +1567,7 @@ class _ProBanner extends StatelessWidget {
                           fontSize: 15,
                           fontWeight: FontWeight.w700)),
                   const SizedBox(height: 2),
-                  Text('Unlimited AI recipes, meal plans & more',
+                  Text('Unlimited intelligent recipes, meal plans & more',
                       style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.7),
                           fontSize: 12)),

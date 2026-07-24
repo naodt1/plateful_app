@@ -96,7 +96,7 @@ class _OnboardingRecipePreviewState extends State<OnboardingRecipePreview> {
       backgroundColor: Colors.transparent,
       builder: (_) => _DemoResultSheet(
         title: 'Healthify Recipe',
-        subtitle: 'AI powered suggestions',
+        subtitle: 'Intelligent suggestions',
         icon: Icons.eco,
         accent: AppColors.accent,
         builder: (_) => const _HealthifyDemoResult(result: kDemoHealthifyResult),

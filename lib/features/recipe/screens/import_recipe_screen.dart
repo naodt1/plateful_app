@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -12,13 +13,14 @@ import '../../subscription/pro_gate.dart';
 import '../../../core/services/firebase_service.dart';
 import '../../../core/services/recipe_adapter.dart';
 import '../../../core/widgets/skeleton_loader.dart';
+import '../../../core/widgets/intelligence_mark.dart';
 import '../../../models/recipe.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/utils/error_messages.dart';
 import '../widgets/collection_picker_sheet.dart';
 
 /// Screen shown when a link is shared into the app from another app
-/// (Instagram, TikTok, YouTube, browser…). It extracts the recipe with AI,
+/// (Instagram, TikTok, YouTube, browser…). It extracts the recipe,
 /// saves it, and shows what was added.
 class ImportRecipeScreen extends ConsumerStatefulWidget {
   final String sharedUrl;
@@ -33,12 +35,37 @@ class _ImportRecipeScreenState extends ConsumerState<ImportRecipeScreen> {
   String? _error;
   String? _noRecipeReason; // set when extraction detects no recipe (e.g. login wall)
   Recipe? _saved;
-  String _status = 'Reading the recipe…';
+  String _status = _stages.first;
+  Timer? _stageTimer;
+  int _stage = 0;
+
+  /// Rotating messages so a 20-second extraction doesn't feel stalled.
+  static const _stages = [
+    'Reading the recipe…',
+    'Pulling out the ingredients…',
+    'Writing up the steps…',
+    'Working out the macros…',
+  ];
 
   @override
   void initState() {
     super.initState();
+    _startStageMessages();
     _import();
+  }
+
+  void _startStageMessages() {
+    _stageTimer?.cancel();
+    _stageTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted || _stage >= _stages.length - 1) return;
+      setState(() => _status = _stages[++_stage]);
+    });
+  }
+
+  @override
+  void dispose() {
+    _stageTimer?.cancel();
+    super.dispose();
   }
 
   String _extractUrl(String raw) {
@@ -110,6 +137,7 @@ class _ImportRecipeScreenState extends ConsumerState<ImportRecipeScreen> {
           final label = restrictions.diet != 'None'
               ? restrictions.diet
               : 'your preferences';
+          _stageTimer?.cancel();
           setState(() => _status = 'Adapting it for $label…');
         }
         finalRecipe = await RecipeAdapter.adaptOnImport(recipe);
@@ -183,7 +211,7 @@ class _ImportRecipeScreenState extends ConsumerState<ImportRecipeScreen> {
   }
 }
 
-// ── Importing (skeleton) ──────────────────────────────────────────────────────
+// ── Importing ─────────────────────────────────────────────────────────────────
 class _ImportingView extends StatelessWidget {
   final String url;
   final String status;
@@ -191,64 +219,72 @@ class _ImportingView extends StatelessWidget {
   const _ImportingView(
       {required this.url, required this.status, required this.colors});
 
+  String get _host {
+    final u = Uri.tryParse(url);
+    final h = u?.host.replaceFirst('www.', '') ?? '';
+    return h.isEmpty ? url : h;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(28, 12, 28, 28),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          const Spacer(flex: 3),
+          const CookingLoader(size: 160),
+          const SizedBox(height: 36),
+
+          // Live status, cross-fading as the stages progress.
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 320),
+            child: Text(
+              status,
+              key: ValueKey(status),
+              textAlign: TextAlign.center,
+              style: AppTextStyles.headingMedium,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.link_rounded, size: 14, color: colors.textSecondary),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(_host,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: colors.textSecondary, fontSize: 13)),
+              ),
+            ],
+          ),
+          const Spacer(flex: 4),
+
+          // Reassurance while the work happens.
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: colors.border),
             ),
             child: Row(
               children: [
-                const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2.5, color: AppColors.primary),
-                ),
-                const SizedBox(width: 14),
+                const IntelligenceGlyph(size: 18),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(status, style: AppTextStyles.labelLarge),
-                      const SizedBox(height: 2),
-                      Text(url,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              color: colors.textSecondary, fontSize: 12)),
-                    ],
+                  child: Text(
+                    'Reading the page, pulling out ingredients and steps, and '
+                    'working out the macros.',
+                    style: AppTextStyles.caption
+                        .copyWith(color: colors.textSecondary, height: 1.4),
                   ),
                 ),
               ],
             ),
-          ).animate(onPlay: (c) => c.repeat()).shimmer(
-              duration: 1400.ms, color: AppColors.primary.withValues(alpha: 0.15)),
-          const SizedBox(height: 24),
-          const SkeletonLoader(width: double.infinity, height: 180, borderRadius: 16),
-          const SizedBox(height: 16),
-          const SkeletonText(width: 220, height: 24),
-          const SizedBox(height: 10),
-          const SkeletonText(width: double.infinity),
-          const SizedBox(height: 6),
-          const SkeletonText(width: 260),
-          const SizedBox(height: 24),
-          const SkeletonText(width: 140, height: 18),
-          const SizedBox(height: 12),
-          ...List.generate(
-              4,
-              (_) => const Padding(
-                    padding: EdgeInsets.only(bottom: 10),
-                    child: SkeletonText(width: double.infinity),
-                  )),
+          ).animate().fadeIn(delay: 300.ms),
         ],
       ),
     );
@@ -323,16 +359,24 @@ class _NoRecipeView extends StatelessWidget {
 
   bool get _isInstagram => sharedUrl.contains('instagram.com');
   bool get _isTikTok => sharedUrl.contains('tiktok.com');
+  bool get _isYouTube =>
+      sharedUrl.contains('youtube.com') || sharedUrl.contains('youtu.be');
 
-  String get _platformName {
+  /// True for social posts, where the recipe usually lives in a caption the
+  /// user can copy. Plain websites get different guidance.
+  bool get _isSocial => _isInstagram || _isTikTok || _isYouTube;
+
+  String? get _platformName {
     if (_isInstagram) return 'Instagram';
     if (_isTikTok) return 'TikTok';
-    return 'this platform';
+    if (_isYouTube) return 'YouTube';
+    return null;
   }
 
   IconData get _platformIcon {
     if (_isInstagram) return Icons.camera_alt_outlined;
     if (_isTikTok) return Icons.music_video_outlined;
+    if (_isYouTube) return Icons.smart_display_outlined;
     return Icons.link_off;
   }
 
@@ -364,8 +408,9 @@ class _NoRecipeView extends StatelessWidget {
           ).animate().fadeIn(delay: 100.ms),
           const SizedBox(height: 10),
 
+          // Show what actually went wrong, straight from the extractor.
           Text(
-            '$_platformName requires a login to view this content, so Plateful couldn\'t read the recipe from the link.',
+            reason,
             textAlign: TextAlign.center,
             style: TextStyle(color: colors.textSecondary, height: 1.55, fontSize: 14),
           ).animate().fadeIn(delay: 150.ms),
@@ -382,27 +427,48 @@ class _NoRecipeView extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('How to import recipes from $_platformName',
+                Text(
+                    _isSocial
+                        ? 'How to import recipes from $_platformName'
+                        : 'What you can try',
                     style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
                         color: colors.textPrimary)),
                 const SizedBox(height: 14),
-                _Tip(
-                  number: '1',
-                  text: 'Open the post in the $_platformName app.',
-                  colors: colors,
-                ),
-                _Tip(
-                  number: '2',
-                  text: 'Copy the recipe text from the caption or comments.',
-                  colors: colors,
-                ),
-                _Tip(
-                  number: '3',
-                  text: 'In Plateful, tap "Add Recipe" and paste the text there.',
-                  colors: colors,
-                ),
+                if (_isSocial) ...[
+                  _Tip(
+                    number: '1',
+                    text: 'Open the post in the $_platformName app.',
+                    colors: colors,
+                  ),
+                  _Tip(
+                    number: '2',
+                    text: 'Copy the recipe text from the caption or comments.',
+                    colors: colors,
+                  ),
+                  _Tip(
+                    number: '3',
+                    text: 'In Plateful, tap "Add Recipe" and paste the text there.',
+                    colors: colors,
+                  ),
+                ] else ...[
+                  _Tip(
+                    number: '1',
+                    text: 'Check the link opens in a browser and shows a recipe.',
+                    colors: colors,
+                  ),
+                  _Tip(
+                    number: '2',
+                    text: 'Some pages hide their recipe behind a paywall or pop-up.',
+                    colors: colors,
+                  ),
+                  _Tip(
+                    number: '3',
+                    text: 'You can always copy the recipe in and add it manually.',
+                    colors: colors,
+                  ),
+                ],
               ],
             ),
           ).animate().fadeIn(delay: 200.ms),
@@ -419,7 +485,7 @@ class _NoRecipeView extends StatelessWidget {
                 }
               },
               icon: const Icon(Icons.open_in_new, size: 18),
-              label: Text('Open in $_platformName'),
+              label: Text(_isSocial ? 'Open in $_platformName' : 'Open link'),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(0, 52),
                 side: BorderSide(color: colors.border),

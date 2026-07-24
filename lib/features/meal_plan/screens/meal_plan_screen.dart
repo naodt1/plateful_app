@@ -12,6 +12,7 @@ import '../widgets/week_calendar.dart';
 import '../widgets/meal_slot_card.dart';
 import '../../subscription/pro_gate.dart';
 import '../../../core/utils/error_messages.dart';
+import '../../../core/widgets/intelligence_mark.dart';
 
 DateTime _getWeekStart(DateTime date) {
   final weekday = date.weekday;
@@ -362,14 +363,13 @@ class _MealPlanScreenState extends ConsumerState<MealPlanScreen> {
                         ),
                         child: Column(
                           children: [
-                            const Icon(Icons.auto_awesome,
-                                size: 36, color: AppColors.primary),
+                            const IntelligenceMark(size: 44),
                             const SizedBox(height: 12),
                             Text('No plan for this week',
                                 style: AppTextStyles.headingMedium),
                             const SizedBox(height: 6),
                             Text(
-                              'Tap "Generate Week" to create an AI meal plan, or tap any slot to add a recipe.',
+                              'Tap "Generate Week" to build a meal plan for you, or tap any slot to add a recipe.',
                               style: AppTextStyles.bodyMedium.copyWith(
                                   color: colors.textSecondary),
                               textAlign: TextAlign.center,

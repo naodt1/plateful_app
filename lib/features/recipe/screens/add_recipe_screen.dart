@@ -14,6 +14,7 @@ import '../../../models/meal_plan.dart';
 import 'package:go_router/go_router.dart';
 import '../../subscription/pro_gate.dart';
 import '../../../core/utils/error_messages.dart';
+import '../../../core/widgets/intelligence_mark.dart';
 
 // Full-page screen kept for deep-link / share-sheet entry
 class AddRecipeScreen extends StatelessWidget {
@@ -421,12 +422,11 @@ class _PasteLinkTab extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.auto_awesome,
-                    color: AppColors.primary, size: 20),
+                const IntelligenceGlyph(size: 20),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Paste any recipe URL and AI will extract the details.',
+                    'Paste any recipe link and Plateful will pull out the details.',
                     style: AppTextStyles.bodySmall
                         .copyWith(color: AppColors.of(context).textPrimary),
                   ),
@@ -460,9 +460,9 @@ class _PasteLinkTab extends StatelessWidget {
             _ExtractionSkeleton()
           else
             AirbnbButton(
-              label: 'Extract Recipe with AI',
+              label: 'Extract Recipe',
               onPressed: onExtract,
-              icon: Icons.auto_awesome,
+              icon: Icons.soup_kitchen_rounded,
             ),
         ],
       ),
@@ -478,7 +478,7 @@ class _ExtractionSkeleton extends StatelessWidget {
       children: [
         const SizedBox(height: 8),
         Center(
-          child: Text('Extracting recipe with AI...',
+          child: Text('Reading the recipe…',
               style: TextStyle(color: AppColors.of(context).textSecondary)),
         ),
         const SizedBox(height: 16),

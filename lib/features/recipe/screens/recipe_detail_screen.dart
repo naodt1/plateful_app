@@ -26,6 +26,7 @@ import '../../../core/widgets/confirm_dialog.dart';
 import '../../subscription/pro_gate.dart';
 import '../../../core/providers/subscription_provider.dart';
 import '../../../core/utils/error_messages.dart';
+import '../../../core/widgets/intelligence_mark.dart';
 
 class RecipeDetailScreen extends ConsumerStatefulWidget {
   final String recipeId;
@@ -986,15 +987,10 @@ class _AdaptedBanner extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
-                showingOriginal
-                    ? Icons.history_rounded
-                    : Icons.auto_awesome_rounded,
-                size: 17,
-                color: showingOriginal
-                    ? colors.textSecondary
-                    : AppColors.primary,
-              ),
+              showingOriginal
+                  ? Icon(Icons.history_rounded,
+                      size: 17, color: colors.textSecondary)
+                  : const IntelligenceGlyph(size: 17),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -1083,10 +1079,10 @@ class _MacroInfoButton extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             _MacroInfoLine(
-              icon: Icons.auto_awesome_rounded,
-              title: 'AI-estimated',
+              icon: Icons.soup_kitchen_rounded,
+              title: 'Intelligently estimated',
               body:
-                  'If it doesn\'t, Plateful\'s AI estimates the macros from the ingredients and serving size.',
+                  'If it doesn\'t, Plateful\'s intelligence estimates the macros from the ingredients and serving size.',
               colors: colors,
             ),
             const SizedBox(height: 16),
@@ -1792,7 +1788,7 @@ class _TailorSheetState extends State<TailorSheet> {
                         width: double.infinity,
                         child: ElevatedButton.icon(
                           onPressed: _profileLoading ? null : _tailor,
-                          icon: const Icon(Icons.auto_awesome, size: 18),
+                          icon: const Icon(Icons.soup_kitchen_rounded, size: 18),
                           label: const Text('Use current preferences'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
