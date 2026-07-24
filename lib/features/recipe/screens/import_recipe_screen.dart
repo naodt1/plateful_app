@@ -10,6 +10,7 @@ import '../../../core/providers/recipe_providers.dart';
 import '../../../core/services/claude_service.dart';
 import '../../subscription/pro_gate.dart';
 import '../../../core/services/firebase_service.dart';
+import '../../../core/services/recipe_adapter.dart';
 import '../../../core/widgets/skeleton_loader.dart';
 import '../../../models/recipe.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -32,6 +33,7 @@ class _ImportRecipeScreenState extends ConsumerState<ImportRecipeScreen> {
   String? _error;
   String? _noRecipeReason; // set when extraction detects no recipe (e.g. login wall)
   Recipe? _saved;
+  String _status = 'Reading the recipe…';
 
   @override
   void initState() {
@@ -99,11 +101,25 @@ class _ImportRecipeScreenState extends ConsumerState<ImportRecipeScreen> {
         servings: (data['servings'] as num?)?.toInt() ?? 4,
       );
 
-      final recipeId = await FirebaseService.saveRecipe(recipe);
+      // Adapt to the user's diet/allergies before saving, so the recipe they
+      // land on is already usable. No-ops when they have no restrictions.
+      final restrictions = await RecipeAdapter.profileRestrictions();
+      var finalRecipe = recipe;
+      if (restrictions != null) {
+        if (mounted) {
+          final label = restrictions.diet != 'None'
+              ? restrictions.diet
+              : 'your preferences';
+          setState(() => _status = 'Adapting it for $label…');
+        }
+        finalRecipe = await RecipeAdapter.adaptOnImport(recipe);
+      }
+
+      final recipeId = await FirebaseService.saveRecipe(finalRecipe);
       refreshRecipeData(ref); // refresh home screen
       if (mounted) {
         setState(() {
-          _saved = recipe.copyWith(id: recipeId);
+          _saved = finalRecipe.copyWith(id: recipeId);
           _loading = false;
         });
       }
@@ -148,7 +164,10 @@ class _ImportRecipeScreenState extends ConsumerState<ImportRecipeScreen> {
       ),
       body: SafeArea(
         child: _loading
-            ? _ImportingView(url: _extractUrl(widget.sharedUrl), colors: colors)
+            ? _ImportingView(
+                url: _extractUrl(widget.sharedUrl),
+                status: _status,
+                colors: colors)
             : _noRecipeReason != null
                 ? _NoRecipeView(
                     reason: _noRecipeReason!,
@@ -167,8 +186,10 @@ class _ImportRecipeScreenState extends ConsumerState<ImportRecipeScreen> {
 // ── Importing (skeleton) ──────────────────────────────────────────────────────
 class _ImportingView extends StatelessWidget {
   final String url;
+  final String status;
   final AppColorScheme colors;
-  const _ImportingView({required this.url, required this.colors});
+  const _ImportingView(
+      {required this.url, required this.status, required this.colors});
 
   @override
   Widget build(BuildContext context) {
@@ -197,8 +218,7 @@ class _ImportingView extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Reading the link with AI…',
-                          style: AppTextStyles.labelLarge),
+                      Text(status, style: AppTextStyles.labelLarge),
                       const SizedBox(height: 2),
                       Text(url,
                           maxLines: 1,

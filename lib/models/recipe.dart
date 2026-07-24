@@ -69,6 +69,19 @@ class Recipe {
   final int servings;
   final bool favorite;
 
+  /// When set, this recipe was automatically adapted to the user's diet on
+  /// import (e.g. "Gluten-Free"). The pre-adaptation version is kept in the
+  /// `original*` fields so the user can always flip back to it.
+  final String? adaptedFor;
+  final String? originalTitle;
+  final List<Ingredient>? originalIngredients;
+  final List<String>? originalSteps;
+
+  /// One-line summary of what changed and why.
+  final String? adaptationSummary;
+
+  bool get isAdapted => adaptedFor != null && originalIngredients != null;
+
   const Recipe({
     required this.id,
     required this.userId,
@@ -84,6 +97,11 @@ class Recipe {
     required this.createdAt,
     this.servings = 4,
     this.favorite = false,
+    this.adaptedFor,
+    this.originalTitle,
+    this.originalIngredients,
+    this.originalSteps,
+    this.adaptationSummary,
   });
 
   factory Recipe.fromJson(Map<String, dynamic> json) {
@@ -130,6 +148,18 @@ class Recipe {
           : DateTime.now(),
       servings: (json['servings'] as num?)?.toInt() ?? 4,
       favorite: json['favorite'] as bool? ?? false,
+      adaptedFor: json['adapted_for'] as String?,
+      originalTitle: json['original_title'] as String?,
+      originalIngredients: json['original_ingredients'] is List
+          ? (json['original_ingredients'] as List)
+              .whereType<Map<String, dynamic>>()
+              .map(Ingredient.fromJson)
+              .toList()
+          : null,
+      originalSteps: json['original_steps'] is List
+          ? (json['original_steps'] as List).map((e) => e.toString()).toList()
+          : null,
+      adaptationSummary: json['adaptation_summary'] as String?,
     );
   }
 
@@ -148,6 +178,12 @@ class Recipe {
         'created_at': createdAt.toIso8601String(),
         'servings': servings,
         'favorite': favorite,
+        'adapted_for': adaptedFor,
+        'original_title': originalTitle,
+        'original_ingredients':
+            originalIngredients?.map((e) => e.toJson()).toList(),
+        'original_steps': originalSteps,
+        'adaptation_summary': adaptationSummary,
       };
 
   Recipe copyWith({
@@ -161,6 +197,11 @@ class Recipe {
     List<String>? tags,
     int? servings,
     bool? favorite,
+    String? adaptedFor,
+    String? originalTitle,
+    List<Ingredient>? originalIngredients,
+    List<String>? originalSteps,
+    String? adaptationSummary,
   }) =>
       Recipe(
         id: id ?? this.id,
@@ -177,5 +218,10 @@ class Recipe {
         createdAt: createdAt,
         servings: servings ?? this.servings,
         favorite: favorite ?? this.favorite,
+        adaptedFor: adaptedFor ?? this.adaptedFor,
+        originalTitle: originalTitle ?? this.originalTitle,
+        originalIngredients: originalIngredients ?? this.originalIngredients,
+        originalSteps: originalSteps ?? this.originalSteps,
+        adaptationSummary: adaptationSummary ?? this.adaptationSummary,
       );
 }

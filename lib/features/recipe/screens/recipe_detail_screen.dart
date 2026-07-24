@@ -49,6 +49,22 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
   bool _isLoading = true;
   int _servings = 4;
 
+  /// When the recipe was auto-adapted on import, lets the user flip back to the
+  /// recipe as originally written. View-only — the stored recipe is unchanged.
+  bool _showOriginal = false;
+
+  /// The version currently on screen: the adapted recipe, or the original when
+  /// the user has toggled it.
+  Recipe? get _displayRecipe {
+    final r = _recipe;
+    if (r == null || !_showOriginal || !r.isAdapted) return r;
+    return r.copyWith(
+      title: r.originalTitle,
+      ingredients: r.originalIngredients,
+      steps: r.originalSteps,
+    );
+  }
+
   final ScrollController _scrollController = ScrollController();
   // 0 = no blur (top), 1 = fully blurred. A ValueNotifier so only the blur
   // layer rebuilds on scroll — not the whole screen (keeps scrolling smooth).
@@ -104,7 +120,7 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
   }
 
   List<Ingredient> get _scaledIngredients {
-    final recipe = _recipe;
+    final recipe = _displayRecipe;
     if (recipe == null) return [];
     final originalServings = recipe.servings;
     if (originalServings == 0) return recipe.ingredients;
@@ -290,7 +306,7 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) return const _LoadingSkeleton();
-    final recipe = _recipe;
+    final recipe = _displayRecipe;
     if (recipe == null) {
       return Scaffold(
         appBar: AppBar(leading: const BackButton()),
@@ -484,6 +500,20 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
                                 overflow: TextOverflow.ellipsis)
                             .animate()
                             .fadeIn(),
+
+                        // Auto-adapted badge + flip back to the original.
+                        if (_recipe?.isAdapted == true) ...[
+                          const SizedBox(height: 12),
+                          _AdaptedBanner(
+                            adaptedFor: _recipe!.adaptedFor!,
+                            summary: _recipe!.adaptationSummary,
+                            showingOriginal: _showOriginal,
+                            colors: colors,
+                            onToggle: () => setState(
+                                () => _showOriginal = !_showOriginal),
+                          ),
+                        ],
+
                         const SizedBox(height: 10),
 
                         // Tags (below title)
@@ -913,6 +943,98 @@ class _SectionHeader extends StatelessWidget {
           ],
           const Spacer(),
           if (trailing != null) trailing!,
+        ],
+      ),
+    );
+  }
+}
+
+/// Banner shown when a recipe was automatically rewritten for the user's diet
+/// on import, with a switch back to the recipe as originally written.
+class _AdaptedBanner extends StatelessWidget {
+  final String adaptedFor;
+  final String? summary;
+  final bool showingOriginal;
+  final AppColorScheme colors;
+  final VoidCallback onToggle;
+
+  const _AdaptedBanner({
+    required this.adaptedFor,
+    required this.summary,
+    required this.showingOriginal,
+    required this.colors,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: showingOriginal
+            ? colors.surface
+            : AppColors.primary.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: showingOriginal
+              ? colors.border
+              : AppColors.primary.withValues(alpha: 0.28),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                showingOriginal
+                    ? Icons.history_rounded
+                    : Icons.auto_awesome_rounded,
+                size: 17,
+                color: showingOriginal
+                    ? colors.textSecondary
+                    : AppColors.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  showingOriginal
+                      ? 'Showing the original recipe'
+                      : 'Adapted for you · $adaptedFor',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: showingOriginal
+                        ? colors.textSecondary
+                        : AppColors.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: onToggle,
+                behavior: HitTestBehavior.opaque,
+                child: Text(
+                  showingOriginal ? 'View adapted' : 'View original',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                    decoration: TextDecoration.underline,
+                    decorationColor: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (!showingOriginal &&
+              summary != null &&
+              summary!.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              summary!,
+              style: AppTextStyles.caption
+                  .copyWith(color: colors.textSecondary, height: 1.35),
+            ),
+          ],
         ],
       ),
     );
