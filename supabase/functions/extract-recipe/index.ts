@@ -1,14 +1,14 @@
 
 const DEEPSEEK_API_KEY = Deno.env.get("DEEPSEEK_API_KEY") ?? "";
 const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY") ?? "";
-const DEEPSEEK_MODEL = "deepseek-chat"; // DeepSeek V3 Pro (aka deepseek-chat)
+const DEEPSEEK_MODEL = "deepseek-v4-pro";
 const FIRECRAWL_URL = "https://api.firecrawl.dev/v2/scrape";
 
-// DeepSeek deepseek-chat pricing, USD per 1M tokens.
+// DeepSeek deepseek-v4-pro pricing, USD per 1M tokens.
 // VERIFY/UPDATE at https://api-docs.deepseek.com (rates change; off-peak is cheaper).
-const PRICE_INPUT_CACHE_HIT = 0.07;
-const PRICE_INPUT_CACHE_MISS = 0.27;
-const PRICE_OUTPUT = 1.10;
+const PRICE_INPUT_CACHE_HIT = 0.003625;
+const PRICE_INPUT_CACHE_MISS = 0.435;
+const PRICE_OUTPUT = 0.87;
 
 /** Compute USD cost from a DeepSeek/OpenAI-style usage object. */
 function deepseekCost(usage: Record<string, number> | undefined) {
@@ -332,6 +332,36 @@ async function scrapeYouTube(
   return { content, imageUrl: thumb ? thumb[1] : null };
 }
 
+// ── Caption-link fallback ─────────────────────────────────────────────────────
+// Creators often caption "full recipe on my blog ⬇️" with a link instead of
+// pasting the recipe. When a social post's caption/description contains an
+// external link, scrape that page too — the canonical recipe usually lives there.
+const CAPTION_LINK_SKIP = [
+  "tiktok.com", "instagram.com", "youtube.com", "youtu.be", "facebook.com",
+  "fb.watch", "twitter.com", "x.com", "linktr.ee", "beacons.ai", "bio.link",
+  "lnk.bio", "linkin.bio", "amazon.", "amzn.to", "discord.gg", "patreon.com",
+  "spotify.com", "apple.com", "google.com/store", "play.google.com",
+];
+
+function findCaptionLink(text: string, originalUrl: string): string | null {
+  const matches = text.match(/https?:\/\/[^\s"'<>()\[\]]+/g) ?? [];
+  for (let m of matches) {
+    m = m.replace(/[.,;:!?]+$/, ""); // strip trailing punctuation
+    let host: string;
+    try {
+      host = new URL(m).hostname.toLowerCase();
+    } catch {
+      continue;
+    }
+    if (m === originalUrl) continue;
+    if (CAPTION_LINK_SKIP.some((s) => host.includes(s) || m.includes(s))) {
+      continue;
+    }
+    return m;
+  }
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -407,6 +437,23 @@ Deno.serve(async (req) => {
         imageUrl = imageUrl ?? r.imageUrl;
       } catch (e) {
         console.error("Direct fetch failed:", e);
+      }
+    }
+
+    // Caption-link fallback: if the caption points at an external site (the
+    // creator's blog), scrape that page too — it usually holds the full recipe.
+    if (source !== "website") {
+      const linked = findCaptionLink(content, url);
+      if (linked) {
+        try {
+          const r = FIRECRAWL_API_KEY
+            ? await scrapeWithFirecrawl(linked, "website")
+            : await scrapeDirect(linked);
+          if (r.content) content += `\nLinked page (${linked}):\n${r.content}`;
+          imageUrl = imageUrl ?? r.imageUrl;
+        } catch (e) {
+          console.error("Caption-link scrape failed:", e);
+        }
       }
     }
 

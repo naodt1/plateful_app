@@ -2,13 +2,13 @@
 // Server-side DeepSeek proxy. Keeps the API key off the client.
 const DEEPSEEK_API_KEY = Deno.env.get("DEEPSEEK_API_KEY") ?? "";
 const DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions";
-const MODEL = "deepseek-chat";
+const MODEL = "deepseek-v4-pro";
 
-// DeepSeek deepseek-chat pricing, USD per 1M tokens.
+// DeepSeek deepseek-v4-pro pricing, USD per 1M tokens.
 // VERIFY/UPDATE at https://api-docs.deepseek.com (rates change; off-peak is cheaper).
-const PRICE_INPUT_CACHE_HIT = 0.07;
-const PRICE_INPUT_CACHE_MISS = 0.27;
-const PRICE_OUTPUT = 1.10;
+const PRICE_INPUT_CACHE_HIT = 0.003625;
+const PRICE_INPUT_CACHE_MISS = 0.435;
+const PRICE_OUTPUT = 0.87;
 
 /** Compute USD cost from a DeepSeek/OpenAI-style usage object. */
 function deepseekCost(usage: Record<string, number> | undefined) {
