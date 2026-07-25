@@ -19,8 +19,9 @@ val keyProperties = Properties().apply {
 
 android {
     namespace = "com.naodtadele.plateful"
-    // Explicit API 35: Google Play requires target SDK 35 for new apps (Aug 2025).
-    compileSdk = maxOf(flutter.compileSdkVersion, 35)
+    // Explicit API 36: Google Play requires targeting within one year of the
+    // latest Android release (API 36 required from Aug 31, 2026).
+    compileSdk = maxOf(flutter.compileSdkVersion, 36)
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -50,8 +51,8 @@ android {
         applicationId = "com.naodtadele.plateful"
         // RevenueCat Paywalls + Customer Center UI require minSdk 24.
         minSdk = maxOf(flutter.minSdkVersion, 24)
-        // Explicit API 35 to satisfy Google Play's new-app target requirement.
-        targetSdk = maxOf(flutter.targetSdkVersion, 35)
+        // Explicit API 36 to satisfy Google Play's target-level requirement.
+        targetSdk = maxOf(flutter.targetSdkVersion, 36)
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
