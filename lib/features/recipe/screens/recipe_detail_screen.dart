@@ -26,7 +26,6 @@ import '../../../core/widgets/confirm_dialog.dart';
 import '../../subscription/pro_gate.dart';
 import '../../../core/providers/subscription_provider.dart';
 import '../../../core/utils/error_messages.dart';
-import '../../../core/widgets/intelligence_mark.dart';
 
 class RecipeDetailScreen extends ConsumerStatefulWidget {
   final String recipeId;
@@ -502,9 +501,9 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
                             .animate()
                             .fadeIn(),
 
-                        // Auto-adapted badge + flip back to the original.
+                        // Auto-adapted chip + flip back to the original.
                         if (_recipe?.isAdapted == true) ...[
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 14),
                           _AdaptedBanner(
                             adaptedFor: _recipe!.adaptedFor!,
                             summary: _recipe!.adaptationSummary,
@@ -952,6 +951,9 @@ class _SectionHeader extends StatelessWidget {
 
 /// Banner shown when a recipe was automatically rewritten for the user's diet
 /// on import, with a switch back to the recipe as originally written.
+/// Compact chip shown when a recipe was rewritten for the user's diet on
+/// import. Kept to a single line to sit alongside the tag row; the full
+/// explanation lives behind a tap so it never dominates the page.
 class _AdaptedBanner extends StatelessWidget {
   final String adaptedFor;
   final String? summary;
@@ -967,72 +969,161 @@ class _AdaptedBanner extends StatelessWidget {
     required this.onToggle,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      decoration: BoxDecoration(
-        color: showingOriginal
-            ? colors.surface
-            : AppColors.primary.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: showingOriginal
-              ? colors.border
-              : AppColors.primary.withValues(alpha: 0.28),
+  static const _dietEmoji = {
+    'Vegan': '🌱',
+    'Vegetarian': '🥦',
+    'Keto': '🥩',
+    'Paleo': '🦴',
+    'Gluten-Free': '🌾',
+    'Halal': '☪️',
+  };
+
+  String get _emoji => _dietEmoji[adaptedFor] ?? '🍽️';
+
+  void _showDetail(BuildContext context) {
+    final text = summary?.trim();
+    if (text == null || text.isEmpty) return;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: BoxDecoration(
+          color: colors.bg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              showingOriginal
-                  ? Icon(Icons.history_rounded,
-                      size: 17, color: colors.textSecondary)
-                  : const IntelligenceGlyph(size: 17),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  showingOriginal
-                      ? 'Showing the original recipe'
-                      : 'Adapted for you · $adaptedFor',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: showingOriginal
-                        ? colors.textSecondary
-                        : AppColors.primary,
-                  ),
-                ),
+        padding: EdgeInsets.fromLTRB(
+            24, 16, 24, MediaQuery.of(context).padding.bottom + 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: colors.border,
+                    borderRadius: BorderRadius.circular(2)),
               ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: onToggle,
-                behavior: HitTestBehavior.opaque,
-                child: Text(
-                  showingOriginal ? 'View adapted' : 'View original',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
-                    decoration: TextDecoration.underline,
-                    decorationColor: AppColors.primary,
-                  ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Text(_emoji, style: const TextStyle(fontSize: 20)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text('Adapted for $adaptedFor',
+                      style: AppTextStyles.headingMedium),
                 ),
-              ),
-            ],
-          ),
-          if (!showingOriginal &&
-              summary != null &&
-              summary!.trim().isNotEmpty) ...[
-            const SizedBox(height: 6),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(text,
+                style: AppTextStyles.bodyMedium
+                    .copyWith(color: colors.textSecondary, height: 1.5)),
+            const SizedBox(height: 16),
             Text(
-              summary!,
-              style: AppTextStyles.caption
-                  .copyWith(color: colors.textSecondary, height: 1.35),
+              'Your original recipe is kept — tap “View original” any time.',
+              style:
+                  AppTextStyles.caption.copyWith(color: colors.textSecondary),
+            ),
+            const SizedBox(height: 22),
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                alignment: Alignment.center,
+                child: const Text('Got it',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15)),
+              ),
             ),
           ],
-        ],
+        ),
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasSummary = (summary?.trim().isNotEmpty ?? false);
+    final tint = showingOriginal ? colors.surface : AppColors.primary;
+
+    return Row(
+      children: [
+        Flexible(
+          child: GestureDetector(
+            onTap: showingOriginal ? null : () => _showDetail(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+              decoration: BoxDecoration(
+                color: showingOriginal
+                    ? colors.surface
+                    : tint.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: showingOriginal
+                      ? colors.border
+                      : tint.withValues(alpha: 0.22),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (showingOriginal)
+                    Icon(Icons.history_rounded,
+                        size: 13, color: colors.textSecondary)
+                  else
+                    Text(_emoji, style: const TextStyle(fontSize: 12)),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      showingOriginal ? 'Original' : 'Adapted · $adaptedFor',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: showingOriginal
+                            ? colors.textSecondary
+                            : AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  if (!showingOriginal && hasSummary) ...[
+                    const SizedBox(width: 5),
+                    Icon(Icons.info_outline_rounded,
+                        size: 12,
+                        color: AppColors.primary.withValues(alpha: 0.7)),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        GestureDetector(
+          onTap: onToggle,
+          behavior: HitTestBehavior.opaque,
+          child: Text(
+            showingOriginal ? 'View adapted' : 'View original',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: colors.textSecondary,
+              decoration: TextDecoration.underline,
+              decorationColor: colors.textSecondary,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
