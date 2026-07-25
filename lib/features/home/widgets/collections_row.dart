@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/services/firebase_service.dart';
@@ -36,7 +37,12 @@ class _CollectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return GestureDetector(
+      onTap: () => context.push(
+          '/collections/${collection.id}'
+          '?name=${Uri.encodeComponent(collection.name)}'),
+      behavior: HitTestBehavior.opaque,
+      child: Container(
       width: 120,
       margin: const EdgeInsets.only(right: 12),
       decoration: BoxDecoration(
@@ -70,6 +76,7 @@ class _CollectionCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

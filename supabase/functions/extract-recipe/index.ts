@@ -460,6 +460,18 @@ Deno.serve(async (req) => {
     const blocked = isLoginWall(content, source);
     const recipe = await extractWithDeepSeek(content, source, imageUrl);
 
+    // The model is told the image URL but frequently drops or nulls it —
+    // especially for videos, where the thumbnail is the only image. The scraped
+    // value is ground truth, so it wins over whatever came back.
+    const modelImage = typeof recipe.image_url === "string"
+      ? recipe.image_url.trim()
+      : "";
+    if (imageUrl) {
+      recipe.image_url = imageUrl;
+    } else if (!modelImage.startsWith("http")) {
+      recipe.image_url = null;
+    }
+
     // Guard against hallucination / empty imports: a real recipe needs BOTH
     // ingredients and steps. Otherwise return a clear no_recipe signal.
     const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
