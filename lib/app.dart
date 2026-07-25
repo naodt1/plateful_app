@@ -6,7 +6,6 @@ import 'core/router/app_router.dart';
 import 'core/services/revenuecat_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/providers/theme_provider.dart';
-import 'core/share/pending_share.dart';
 
 class PlatefulApp extends ConsumerStatefulWidget {
   const PlatefulApp({super.key});
@@ -51,22 +50,8 @@ class _PlatefulAppState extends ConsumerState<PlatefulApp>
       },
     );
 
-    // Share that launched the app from a cold start. Stash it and let the
-    // splash screen route to the import flow *after* it navigates — otherwise
-    // the splash's go('/home') clobbers an import screen pushed here and the
-    // parse finishes invisibly in the background.
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      try {
-        final files = await ReceiveSharingIntent.instance.getInitialMedia();
-        final shared = _extractSharedUrl(files);
-        if (shared != null) {
-          PendingShare.set(shared);
-          ReceiveSharingIntent.instance.reset();
-        }
-      } catch (e) {
-        debugPrint('[ShareIntent] getInitialMedia error: $e');
-      }
-    });
+    // Cold-start shares are resolved in main() before the first frame so the
+    // splash can route straight to the import.
   }
 
   /// Pull the first text/url payload out of a share (Instagram, TikTok,

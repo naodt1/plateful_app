@@ -77,6 +77,16 @@ class RecipeAdapter {
       // Nothing actually changed — keep it as a normal, unbadged recipe.
       if (changes.isEmpty) return recipe;
 
+      // Keep each replacement so the ingredient list can show what changed.
+      final swaps = changes
+          .whereType<Map<String, dynamic>>()
+          .map((c) => IngredientSwap(
+                from: (c['original'] as String?)?.trim() ?? '',
+                to: (c['replacement'] as String?)?.trim() ?? '',
+              ))
+          .where((s) => s.from.isNotEmpty && s.to.isNotEmpty)
+          .toList();
+
       final label = restrictions.diet != 'None'
           ? restrictions.diet
           : restrictions.allergies.join(', ');
@@ -96,6 +106,7 @@ class RecipeAdapter {
         originalIngredients: recipe.ingredients,
         originalSteps: recipe.steps,
         adaptationSummary: (result['overallAssessment'] as String?)?.trim(),
+        adaptationSwaps: swaps.isEmpty ? null : swaps,
       );
     } catch (e) {
       debugPrint('RecipeAdapter: adaptation failed, keeping original: $e');

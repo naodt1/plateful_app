@@ -13,6 +13,9 @@ class PendingShare {
   /// Stash a shared URL received before the app has finished launching.
   static void set(String url) => _url = url;
 
+  /// Whether a cold-start share is waiting to be handled.
+  static bool get has => _url != null;
+
   /// Returns the pending URL (if any) and clears it so it's consumed once.
   static String? take() {
     final url = _url;

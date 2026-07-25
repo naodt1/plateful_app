@@ -119,6 +119,24 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
     }
   }
 
+
+  /// If [name] is an ingredient that replaced another during adaptation,
+  /// returns the ingredient it replaced. Null while viewing the original.
+  String? _swappedFrom(String name) {
+    final r = _recipe;
+    if (_showOriginal || r == null || !r.isAdapted) return null;
+    final swaps = r.adaptationSwaps;
+    if (swaps == null || swaps.isEmpty) return null;
+
+    final n = name.toLowerCase().trim();
+    for (final s in swaps) {
+      final to = s.to.toLowerCase().trim();
+      if (to.isEmpty) continue;
+      if (n == to || n.contains(to) || to.contains(n)) return s.from;
+    }
+    return null;
+  }
+
   List<Ingredient> get _scaledIngredients {
     final recipe = _displayRecipe;
     if (recipe == null) return [];
@@ -652,6 +670,7 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
                       child: _CollapsibleIngredientList(
                         ingredients: _scaledIngredients,
                         colors: colors,
+                        swappedFrom: _swappedFrom,
                       ),
                     ),
 
@@ -1313,9 +1332,13 @@ class _CollapsibleIngredientList extends StatefulWidget {
   final List<Ingredient> ingredients;
   final AppColorScheme colors;
 
+  /// Resolves an ingredient name to the one it replaced during adaptation.
+  final String? Function(String name)? swappedFrom;
+
   const _CollapsibleIngredientList({
     required this.ingredients,
     required this.colors,
+    this.swappedFrom,
   });
 
   @override
@@ -1338,7 +1361,11 @@ class _CollapsibleIngredientListState
       children: visible
           .asMap()
           .entries
-          .map((e) => IngredientRow(ingredient: e.value, index: e.key))
+          .map((e) => IngredientRow(
+                ingredient: e.value,
+                index: e.key,
+                swappedFrom: widget.swappedFrom?.call(e.value.name),
+              ))
           .toList(),
     );
 

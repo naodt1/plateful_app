@@ -62,21 +62,27 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    // Navigate after a comfortable pause
-    Timer(const Duration(milliseconds: 2200), _navigate);
+    // A share launched the app: the user is waiting on their recipe, so skip
+    // the splash entirely. Otherwise hold just long enough to read the logo.
+    if (PendingShare.has) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _navigate());
+    } else {
+      Timer(const Duration(milliseconds: 1200), _navigate);
+    }
   }
 
   void _navigate() {
     if (!mounted) return;
     if (FirebaseService.currentUserId != null) {
+      // Home first so back from the import lands somewhere sensible, then the
+      // import on top — both happen in the same frame, so nothing flashes.
       context.go('/home');
-      // If the app was cold-started from a share, route to the import flow now
-      // that home is in place — pushing earlier would have been clobbered here.
       final sharedUrl = PendingShare.take();
       if (sharedUrl != null) {
         context.push('/recipe/import', extra: {'url': sharedUrl});
       }
     } else {
+      // Not signed in: leave any pending share queued for after sign-in.
       context.go('/onboarding');
     }
   }

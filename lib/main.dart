@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'app.dart';
 import 'firebase_options.dart';
 import 'core/services/firebase_service.dart';
 import 'core/services/revenuecat_service.dart';
 import 'core/services/notification_service.dart';
+import 'core/share/pending_share.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,6 +56,27 @@ void main() async {
   }, onError: (e) {
     debugPrint('Auth state listener error (ignored): $e');
   });
+
+  // Resolve a share that launched the app *before* the first frame, so the
+  // splash can skip its animation and go straight to the import. Bounded so a
+  // slow platform channel can never hold up startup.
+  try {
+    final files = await ReceiveSharingIntent.instance
+        .getInitialMedia()
+        .timeout(const Duration(milliseconds: 700));
+    for (final f in files) {
+      if (f.type == SharedMediaType.text || f.type == SharedMediaType.url) {
+        if (f.path.trim().isNotEmpty) PendingShare.set(f.path);
+        break;
+      }
+    }
+    if (files.isNotEmpty && !PendingShare.has) {
+      if (files.first.path.trim().isNotEmpty) PendingShare.set(files.first.path);
+    }
+    if (PendingShare.has) ReceiveSharingIntent.instance.reset();
+  } catch (e) {
+    debugPrint('Initial share lookup skipped: $e');
+  }
 
   runApp(
     const ProviderScope(

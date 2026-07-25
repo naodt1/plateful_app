@@ -53,6 +53,22 @@ class Nutrition {
       };
 }
 
+/// One ingredient the intelligence replaced when adapting a recipe, so the
+/// detail screen can show what a swapped ingredient used to be.
+class IngredientSwap {
+  final String from;
+  final String to;
+
+  const IngredientSwap({required this.from, required this.to});
+
+  factory IngredientSwap.fromJson(Map<String, dynamic> json) => IngredientSwap(
+        from: json['from'] as String? ?? '',
+        to: json['to'] as String? ?? '',
+      );
+
+  Map<String, dynamic> toJson() => {'from': from, 'to': to};
+}
+
 class Recipe {
   final String id;
   final String userId;
@@ -80,6 +96,9 @@ class Recipe {
   /// One-line summary of what changed and why.
   final String? adaptationSummary;
 
+  /// The individual ingredient replacements made during adaptation.
+  final List<IngredientSwap>? adaptationSwaps;
+
   bool get isAdapted => adaptedFor != null && originalIngredients != null;
 
   const Recipe({
@@ -102,6 +121,7 @@ class Recipe {
     this.originalIngredients,
     this.originalSteps,
     this.adaptationSummary,
+    this.adaptationSwaps,
   });
 
   factory Recipe.fromJson(Map<String, dynamic> json) {
@@ -160,6 +180,12 @@ class Recipe {
           ? (json['original_steps'] as List).map((e) => e.toString()).toList()
           : null,
       adaptationSummary: json['adaptation_summary'] as String?,
+      adaptationSwaps: json['adaptation_swaps'] is List
+          ? (json['adaptation_swaps'] as List)
+              .whereType<Map<String, dynamic>>()
+              .map(IngredientSwap.fromJson)
+              .toList()
+          : null,
     );
   }
 
@@ -184,6 +210,8 @@ class Recipe {
             originalIngredients?.map((e) => e.toJson()).toList(),
         'original_steps': originalSteps,
         'adaptation_summary': adaptationSummary,
+        'adaptation_swaps':
+            adaptationSwaps?.map((e) => e.toJson()).toList(),
       };
 
   Recipe copyWith({
@@ -202,6 +230,7 @@ class Recipe {
     List<Ingredient>? originalIngredients,
     List<String>? originalSteps,
     String? adaptationSummary,
+    List<IngredientSwap>? adaptationSwaps,
   }) =>
       Recipe(
         id: id ?? this.id,
@@ -223,5 +252,6 @@ class Recipe {
         originalIngredients: originalIngredients ?? this.originalIngredients,
         originalSteps: originalSteps ?? this.originalSteps,
         adaptationSummary: adaptationSummary ?? this.adaptationSummary,
+        adaptationSwaps: adaptationSwaps ?? this.adaptationSwaps,
       );
 }

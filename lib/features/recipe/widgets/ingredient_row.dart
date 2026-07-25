@@ -6,7 +6,16 @@ class IngredientRow extends StatefulWidget {
   final Ingredient ingredient;
   final int index;
 
-  const IngredientRow({super.key, required this.ingredient, required this.index});
+  /// When this ingredient replaced another during diet adaptation, the name it
+  /// replaced — shown beneath so the swap is visible at a glance.
+  final String? swappedFrom;
+
+  const IngredientRow({
+    super.key,
+    required this.ingredient,
+    required this.index,
+    this.swappedFrom,
+  });
 
   @override
   State<IngredientRow> createState() => _IngredientRowState();
@@ -69,7 +78,11 @@ class _IngredientRowState extends State<IngredientRow> {
         decoration: BoxDecoration(
           color: AppColors.of(context).surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.of(context).border),
+          border: Border.all(
+            color: widget.swappedFrom != null
+                ? AppColors.primary.withValues(alpha: 0.35)
+                : AppColors.of(context).border,
+          ),
         ),
         child: Row(
           children: [
@@ -79,20 +92,48 @@ class _IngredientRowState extends State<IngredientRow> {
               style: const TextStyle(fontSize: 15),
             ),
             const SizedBox(width: 8),
-            // Name
+            // Name (plus what it replaced, when adapted)
             Expanded(
-              child: Text(
-                widget.ingredient.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  decoration: _checked ? TextDecoration.lineThrough : null,
-                  color: _checked
-                      ? AppColors.of(context).textSecondary
-                      : AppColors.of(context).textPrimary,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    widget.ingredient.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      decoration: _checked ? TextDecoration.lineThrough : null,
+                      color: _checked
+                          ? AppColors.of(context).textSecondary
+                          : AppColors.of(context).textPrimary,
+                    ),
+                  ),
+                  if (widget.swappedFrom != null) ...[
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Icon(Icons.swap_horiz_rounded,
+                            size: 11, color: AppColors.primary),
+                        const SizedBox(width: 3),
+                        Flexible(
+                          child: Text(
+                            'swapped for ${widget.swappedFrom}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.primary.withValues(alpha: 0.85),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
               ),
             ),
             // Amount
