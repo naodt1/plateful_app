@@ -14,6 +14,22 @@
       },
       "oauth_client": [
         {
+          "client_id": "42236543449-1dp5nh8a0p7uo63q85pstbl5k6dj36st.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.naodtadele.plateful",
+            "certificate_hash": "bc7b7042329abfce20ad2c0d370d0817e55b80e4"
+          }
+        },
+        {
+          "client_id": "42236543449-d21oiaosrcb6go5310anpn94qdu0itdc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.naodtadele.plateful",
+            "certificate_hash": "efcb151da5db4ee370ef7e100c0ed6b97594029a"
+          }
+        },
+        {
           "client_id": "42236543449-k6cjrv9ref3te5ujbns3n8tlsv5rt019.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

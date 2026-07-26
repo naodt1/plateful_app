@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -117,6 +118,9 @@ class FirebaseService {
   /// the user simply cancelled (nothing to show).
   static String? authErrorMessage(Object e) {
     if (e is FirebaseAuthException) {
+      // Keep the real code in the logs — the friendly text below deliberately
+      // hides it, which makes field reports hard to diagnose otherwise.
+      debugPrint('Auth error [${e.code}]: ${e.message}');
       switch (e.code) {
         case 'canceled':
         case 'web-context-canceled':
@@ -144,6 +148,18 @@ class FirebaseService {
         case 'missing-config':
         case 'no-id-token':
           return 'Google sign-in isn\'t available right now. Try email instead.';
+        // google_sign_in surfaces platform failures through these codes. The
+        // configuration ones mean this build's signing key has no OAuth client
+        // registered — useless to the user, but say something actionable.
+        case 'clientConfigurationError':
+        case 'providerConfigurationError':
+        case 'DEVELOPER_ERROR':
+          return 'Google sign-in isn\'t set up for this version of the app. '
+              'Please sign in with your email instead.';
+        case 'uiUnavailable':
+          return 'Google sign-in couldn\'t open. Please try again.';
+        case 'interrupted':
+          return 'Google sign-in was interrupted. Please try again.';
         default:
           return 'Something went wrong. Please try again.';
       }
