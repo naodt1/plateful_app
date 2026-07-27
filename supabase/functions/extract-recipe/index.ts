@@ -1,14 +1,14 @@
 
 const DEEPSEEK_API_KEY = Deno.env.get("DEEPSEEK_API_KEY") ?? "";
 const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY") ?? "";
-const DEEPSEEK_MODEL = "deepseek-v4-pro";
+const DEEPSEEK_MODEL = "deepseek-v4-flash";
 const FIRECRAWL_URL = "https://api.firecrawl.dev/v2/scrape";
 
-// DeepSeek deepseek-v4-pro pricing, USD per 1M tokens.
+// DeepSeek deepseek-v4-flash pricing, USD per 1M tokens.
 // VERIFY/UPDATE at https://api-docs.deepseek.com (rates change; off-peak is cheaper).
-const PRICE_INPUT_CACHE_HIT = 0.003625;
-const PRICE_INPUT_CACHE_MISS = 0.435;
-const PRICE_OUTPUT = 0.87;
+const PRICE_INPUT_CACHE_HIT = 0.0028;
+const PRICE_INPUT_CACHE_MISS = 0.14;
+const PRICE_OUTPUT = 0.28;
 
 /** Compute USD cost from a DeepSeek/OpenAI-style usage object. */
 function deepseekCost(usage: Record<string, number> | undefined) {
