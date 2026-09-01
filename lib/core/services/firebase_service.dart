@@ -30,6 +30,25 @@ class FirebaseService {
   static User? get currentUser => _auth.currentUser;
   static String? get currentUserId => _auth.currentUser?.uid;
 
+  /// Resolves once Firebase has finished restoring any persisted session.
+  ///
+  /// [currentUser] is null during that restore, so reading it synchronously on
+  /// a cold start reports "signed out" for a user who is signed in. Anything
+  /// that routes on auth state must await this first. Bounded so a network
+  /// stall cannot hang the launch; on timeout we fall back to whatever the
+  /// SDK currently has.
+  static Future<User?> authReady({
+    Duration timeout = const Duration(seconds: 5),
+  }) async {
+    final existing = _auth.currentUser;
+    if (existing != null) return existing;
+    try {
+      return await _auth.authStateChanges().first.timeout(timeout);
+    } catch (_) {
+      return _auth.currentUser;
+    }
+  }
+
   /// Root document for the signed-in user. Throws if not signed in.
   static DocumentReference<Map<String, dynamic>> get _userDoc {
     final uid = currentUserId;

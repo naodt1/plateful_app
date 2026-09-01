@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/services/analytics_service.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
@@ -38,6 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
+      Analytics.login('email');
       await FirebaseService.signInWithEmail(
         _emailController.text.trim(),
         _passwordController.text,
@@ -54,6 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _googleSignIn() async {
     setState(() => _isLoading = true);
     try {
+      Analytics.login('google');
       await FirebaseService.signInWithGoogle();
       if (mounted) context.go('/home');
     } catch (e) {

@@ -4,7 +4,6 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
-import 'revenuecat_service.dart';
 
 /// Local notifications, currently used for the "your free trial ends soon"
 /// reminder. The reminder is scheduled from RevenueCat's real entitlement
@@ -65,7 +64,17 @@ class NotificationService {
   static Future<void> syncTrialReminder(CustomerInfo? info) async {
     if (!_ready) return;
 
-    final ent = info?.entitlements.active[RevenueCatService.entitlementId];
+    // Do not look the entitlement up by exact id. Dashboard identifiers get
+    // renamed and re-cased, and an exact match means the trial reminder
+    // silently never fires. Plateful sells one subscription, so take the
+    // active entitlement that is in a trial, whatever it is called.
+    final active = info?.entitlements.active.values;
+    final ent = (active == null || active.isEmpty)
+        ? null
+        : active.firstWhere(
+            (e) => e.periodType == PeriodType.trial,
+            orElse: () => active.first,
+          );
     final inTrial = ent != null && ent.periodType == PeriodType.trial;
     final expiry =
         ent?.expirationDate != null ? DateTime.tryParse(ent!.expirationDate!) : null;

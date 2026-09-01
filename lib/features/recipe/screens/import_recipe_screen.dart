@@ -10,6 +10,9 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/providers/recipe_providers.dart';
 import '../../../core/services/claude_service.dart';
 import '../../subscription/pro_gate.dart';
+import '../../subscription/paywall.dart';
+import '../../../core/services/analytics_service.dart';
+import '../../../core/services/meta_ads_service.dart';
 import '../../../core/services/firebase_service.dart';
 import '../../../core/services/recipe_adapter.dart';
 import '../../../core/widgets/skeleton_loader.dart';
@@ -34,6 +37,7 @@ class _ImportRecipeScreenState extends ConsumerState<ImportRecipeScreen> {
   bool _loading = true;
   String? _error;
   String? _noRecipeReason; // set when extraction detects no recipe (e.g. login wall)
+  bool _outOfImports = false; // free allowance spent and the user declined Pro
   Recipe? _saved;
   String _status = _stages.first;
   Timer? _stageTimer;
@@ -68,6 +72,15 @@ class _ImportRecipeScreenState extends ConsumerState<ImportRecipeScreen> {
     super.dispose();
   }
 
+  /// Buckets the link so analytics can show which platforms fail most.
+  String _sourceOf(String url) {
+    final u = url.toLowerCase();
+    if (u.contains('tiktok.com')) return 'tiktok';
+    if (u.contains('instagram.com')) return 'instagram';
+    if (u.contains('youtube.com') || u.contains('youtu.be')) return 'youtube';
+    return 'website';
+  }
+
   String _extractUrl(String raw) {
     // Shared text often contains caption + URL; pull the first http(s) link.
     final match = RegExp(r'https?://[^\s]+').firstMatch(raw);
@@ -75,14 +88,15 @@ class _ImportRecipeScreenState extends ConsumerState<ImportRecipeScreen> {
   }
 
   Future<void> _import() async {
-    // Importing via share counts toward the free-import limit.
+    // Importing via share counts toward the free-import limit. allowImport
+    // explains the limit and only opens the paywall if the user asks for it.
     if (!await ProGate.allowImport(context)) {
       if (mounted) {
         setState(() {
           _loading = false;
-          _noRecipeReason =
-              'You\'ve used all your free imports. Upgrade to Plateful Pro for unlimited recipe imports.';
+          _outOfImports = true;
         });
+        Analytics.paywallDismissed('import_limit');
       }
       return;
     }
@@ -91,9 +105,14 @@ class _ImportRecipeScreenState extends ConsumerState<ImportRecipeScreen> {
       _loading = true;
       _error = null;
       _noRecipeReason = null;
+      _outOfImports = false;
     });
+    final url = _extractUrl(widget.sharedUrl);
+    final source = _sourceOf(url);
+    final startedAt = DateTime.now();
+    Analytics.importStarted(source: source, entry: 'share_sheet');
+    Analytics.breadcrumb('import started from $source');
     try {
-      final url = _extractUrl(widget.sharedUrl);
       final data = await ClaudeService.extractRecipeFromUrl(url);
       await ProGate.recordImport();
 
@@ -144,6 +163,13 @@ class _ImportRecipeScreenState extends ConsumerState<ImportRecipeScreen> {
       }
 
       final recipeId = await FirebaseService.saveRecipe(finalRecipe);
+      Analytics.importSucceeded(
+        source: source,
+        ingredients: finalRecipe.ingredients.length,
+        steps: finalRecipe.steps.length,
+        seconds: DateTime.now().difference(startedAt).inSeconds,
+      );
+      MetaAds.recipeImported(source);
       refreshRecipeData(ref); // refresh home screen
       if (mounted) {
         setState(() {
@@ -153,13 +179,16 @@ class _ImportRecipeScreenState extends ConsumerState<ImportRecipeScreen> {
       }
     } on NoRecipeFoundException catch (e) {
       // Platform blocks scraping (Instagram/TikTok login wall, etc.)
+      Analytics.importFailed(source: source, reason: 'no_recipe_found');
       if (mounted) {
         setState(() {
           _noRecipeReason = e.reason;
           _loading = false;
         });
       }
-    } catch (e) {
+    } catch (e, st) {
+      Analytics.importFailed(source: source, reason: 'error');
+      Analytics.recordError(e, st, context: 'recipe import from $source');
       if (mounted) {
         setState(() {
           _error = friendlyError(e);
@@ -196,6 +225,18 @@ class _ImportRecipeScreenState extends ConsumerState<ImportRecipeScreen> {
                 url: _extractUrl(widget.sharedUrl),
                 status: _status,
                 colors: colors)
+            : _outOfImports
+                ? _OutOfImportsView(
+                    onSeePro: () async {
+                      final unlocked =
+                          await PlatefulPaywall.forcePresent(context);
+                      if (unlocked && mounted) {
+                        _import(); // they upgraded, so run the import they wanted
+                      }
+                    },
+                    onClose: _close,
+                    colors: colors,
+                  )
             : _noRecipeReason != null
                 ? _NoRecipeView(
                     reason: _noRecipeReason!,
@@ -206,6 +247,102 @@ class _ImportRecipeScreenState extends ConsumerState<ImportRecipeScreen> {
                 : _error != null
                     ? _ErrorView(error: _error!, onRetry: _import, onClose: _close, colors: colors)
                     : _SuccessView(recipe: _saved!, onClose: _close, colors: colors),
+      ),
+    );
+  }
+}
+
+// ── Out of free imports ───────────────────────────────────────────────────────
+/// Distinct from [_NoRecipeView]: nothing went wrong with the link, the free
+/// allowance is simply spent. Saying so plainly, and naming the link they just
+/// shared, is what keeps this from feeling like a bait and switch.
+class _OutOfImportsView extends StatelessWidget {
+  final Future<void> Function() onSeePro;
+  final VoidCallback onClose;
+  final AppColorScheme colors;
+
+  const _OutOfImportsView({
+    required this.onSeePro,
+    required this.onClose,
+    required this.colors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+          24, 32, 24, MediaQuery.of(context).padding.bottom + 24),
+      child: Column(
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.auto_awesome,
+                size: 34, color: AppColors.accent),
+          )
+              .animate()
+              .scale(
+                  begin: const Offset(0.7, 0.7),
+                  duration: 350.ms,
+                  curve: Curves.easeOut),
+          const SizedBox(height: 20),
+          Text(
+            'You have used your ${ProLimits.freeImports} free imports',
+            style: AppTextStyles.headingMedium,
+            textAlign: TextAlign.center,
+          ).animate().fadeIn(delay: 100.ms),
+          const SizedBox(height: 10),
+          Text(
+            'This link was not saved. Every recipe imported from a link is '
+            'read and written up by AI, which costs us on each import. '
+            'Plateful Pro removes the limit.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                color: colors.textSecondary, height: 1.55, fontSize: 14),
+          ).animate().fadeIn(delay: 150.ms),
+          const SizedBox(height: 28),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: onSeePro,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(0, 52),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+              ),
+              child: const Text('See Plateful Pro',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton(
+              onPressed: onClose,
+              style: TextButton.styleFrom(
+                minimumSize: const Size(0, 48),
+                foregroundColor: colors.textSecondary,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+              ),
+              child: const Text('Close',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'You can still add recipes by hand for free.',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.caption.copyWith(color: colors.textSecondary),
+          ),
+        ],
       ),
     );
   }

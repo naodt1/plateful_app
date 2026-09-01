@@ -192,25 +192,8 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
                     .animate()
                     .fadeIn(delay: 600.ms)
                     .slideY(begin: 0.3, end: 0),
-                const SizedBox(height: 18),
-                GestureDetector(
-                  onTap: () => context.push('/login'),
-                  child: RichText(
-                    text: TextSpan(
-                      style: AppTextStyles.bodyMedium
-                          .copyWith(color: colors.textSecondary),
-                      children: const [
-                        TextSpan(text: 'Already have an account? '),
-                        TextSpan(
-                          text: 'Sign In',
-                          style: TextStyle(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w700),
-                        ),
-                      ],
-                    ),
-                  ),
-                ).animate().fadeIn(delay: 700.ms),
+                // Sign in lives on the signup screen at the end of this flow,
+                // so returning users still have a route in.
                 const SizedBox(height: 12),
               ],
             ),

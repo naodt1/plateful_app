@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/services/analytics_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
@@ -59,6 +60,7 @@ class _MealPlanScreenState extends ConsumerState<MealPlanScreen> {
       final profile = await FirebaseService.getProfile();
       final dietMode = profile?['diet_mode'] as String? ?? 'None';
       final plan = await ClaudeService.generateMealPlan(dietMode);
+      Analytics.mealPlanGenerated();
 
       final slotsMap = <String, Map<String, MealSlot>>{};
       final dayNames = [

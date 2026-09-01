@@ -62,18 +62,28 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    // A share launched the app: the user is waiting on their recipe, so skip
-    // the splash entirely. Otherwise hold just long enough to read the logo.
-    if (PendingShare.has) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _navigate());
-    } else {
-      Timer(const Duration(milliseconds: 1200), _navigate);
-    }
+    _boot();
   }
 
-  void _navigate() {
+  /// Waits for Firebase to restore any saved session before deciding where to
+  /// go. Reading currentUser on a timer raced the restore and sent signed in
+  /// users to onboarding.
+  Future<void> _boot() async {
+    // A share launched the app: the user is waiting on their recipe, so do not
+    // hold the splash any longer than the auth check needs. Otherwise keep the
+    // logo up briefly, running both waits together so the slower one wins.
+    final minimumSplash = PendingShare.has
+        ? Future<void>.value()
+        : Future<void>.delayed(const Duration(milliseconds: 1200));
+    final user = await FirebaseService.authReady();
+    await minimumSplash;
     if (!mounted) return;
-    if (FirebaseService.currentUserId != null) {
+    _navigate(signedIn: user != null);
+  }
+
+  void _navigate({required bool signedIn}) {
+    if (!mounted) return;
+    if (signedIn) {
       // Home first so back from the import lands somewhere sensible, then the
       // import on top — both happen in the same frame, so nothing flashes.
       context.go('/home');

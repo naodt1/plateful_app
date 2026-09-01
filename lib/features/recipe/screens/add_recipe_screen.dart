@@ -13,6 +13,7 @@ import '../../../models/recipe.dart';
 import '../../../models/meal_plan.dart';
 import 'package:go_router/go_router.dart';
 import '../../subscription/pro_gate.dart';
+import '../../../core/services/analytics_service.dart';
 import '../../../core/utils/error_messages.dart';
 import '../../../core/widgets/intelligence_mark.dart';
 
@@ -109,13 +110,24 @@ class _AddRecipeSheetState extends ConsumerState<AddRecipeSheet>
           .showSnackBar(const SnackBar(content: Text('Please enter a URL')));
       return;
     }
-    // AI extraction counts as an import — free users are limited.
+    // AI extraction counts as an import. allowImport explains the limit and
+    // only opens the paywall if the user asks to see it.
     if (!await ProGate.allowImport(context)) return;
     if (!mounted) return;
     setState(() => _isExtracting = true);
+    final url = _urlController.text.trim();
+    final u = url.toLowerCase();
+    final source = u.contains('tiktok.com')
+        ? 'tiktok'
+        : u.contains('instagram.com')
+            ? 'instagram'
+            : (u.contains('youtube.com') || u.contains('youtu.be'))
+                ? 'youtube'
+                : 'website';
+    final startedAt = DateTime.now();
+    Analytics.importStarted(source: source, entry: 'paste');
     try {
-      final recipe =
-          await ClaudeService.extractRecipeFromUrl(_urlController.text.trim());
+      final recipe = await ClaudeService.extractRecipeFromUrl(url);
       await ProGate.recordImport();
       setState(() {
         _extractedRecipe = recipe;
@@ -134,8 +146,21 @@ class _AddRecipeSheetState extends ConsumerState<AddRecipeSheet>
         _steps.clear();
         _steps.addAll(stepsList.map((e) => e.toString()));
       });
+      Analytics.importSucceeded(
+        source: source,
+        ingredients: _ingredients.length,
+        steps: _steps.length,
+        seconds: DateTime.now().difference(startedAt).inSeconds,
+      );
       _tabController.animateTo(1);
-    } catch (e) {
+    } catch (e, st) {
+      Analytics.importFailed(
+        source: source,
+        reason: e is NoRecipeFoundException ? 'no_recipe_found' : 'error',
+      );
+      if (e is! NoRecipeFoundException) {
+        Analytics.recordError(e, st, context: 'paste import from $source');
+      }
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(friendlyError(e))));

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/services/analytics_service.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -31,6 +32,7 @@ class _PantrySuggestionsSheetState extends State<PantrySuggestionsSheet> {
     try {
       final suggestions =
           await ClaudeService.suggestFromPantry(widget.pantryItems);
+      Analytics.pantrySuggestUsed(widget.pantryItems.length);
       setState(() {
         _suggestions = suggestions;
         _isLoading = false;

@@ -3,6 +3,7 @@
 const DEEPSEEK_API_KEY = Deno.env.get("DEEPSEEK_API_KEY") ?? "";
 const DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions";
 const MODEL = "deepseek-v4-flash";
+const MAX_OUTPUT_TOKENS = 8192;
 
 // DeepSeek deepseek-v4-flash pricing, USD per 1M tokens.
 // VERIFY/UPDATE at https://api-docs.deepseek.com (rates change; off-peak is cheaper).
@@ -100,7 +101,10 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 4096,
+        // Reasoning model: thinking and the answer share this budget. At 4096
+        // a complex Tailor or meal plan request could spend it all thinking
+        // and return an empty completion.
+        max_tokens: MAX_OUTPUT_TOKENS,
         messages: [{ role: "user", content: prompt }],
       }),
     });
@@ -117,11 +121,36 @@ Deno.serve(async (req) => {
     }
 
     const json = await res.json();
-    const content = json.choices?.[0]?.message?.content ?? "";
+    const choice = json.choices?.[0] ?? {};
+    const finishReason = String(choice.finish_reason ?? "");
+    let content = choice.message?.content ?? "";
+    // If the answer got cut off mid-flight, the reasoning scratchpad sometimes
+    // still holds a usable payload.
+    if (!content.trim() && typeof choice.message?.reasoning_content === "string") {
+      content = choice.message.reasoning_content;
+    }
     const { usage, costUsd } = deepseekCost(json.usage);
-    // Cost analytics: console only (visible in `supabase functions logs ai-chat`).
+    // Cost analytics: console only (visible in the Deno Deploy logs).
     // Intentionally NOT returned to the client / UI.
-    console.log(JSON.stringify({ fn: "ai-chat", model: MODEL, usage, costUsd }));
+    console.log(JSON.stringify({
+      fn: "ai-chat", model: MODEL, usage, costUsd, finishReason,
+    }));
+
+    // Returning an empty string here would surface downstream as an unrelated
+    // parse failure in the app. Fail loudly instead.
+    if (!content.trim()) {
+      return new Response(
+        JSON.stringify({
+          error: "The model ran out of room before answering. Try again.",
+          finishReason,
+        }),
+        {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
     return new Response(JSON.stringify({ content }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

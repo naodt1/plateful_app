@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/services/analytics_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -248,6 +249,37 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             child: const Text('Close'),
           ),
         ],
+      ),
+    );
+  }
+
+  bool _restoring = false;
+
+  /// Re-checks the store for an existing subscription and unlocks Pro if one
+  /// is found. The way back in for anyone who paid but is not being recognised
+  /// as Pro, after a reinstall, a new device, or an entitlement misconfigured
+  /// on the dashboard.
+  Future<void> _restorePurchases() async {
+    setState(() => _restoring = true);
+    final result = await RevenueCatService.instance.restore();
+    if (!mounted) return;
+    setState(() => _restoring = false);
+
+    // A restore can change what is purchasable, so let the next check re-ask.
+    RevenueCatService.instance.invalidateOfferingsCache();
+    if (result.success) Analytics.purchaseRestored();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result.success
+              ? 'Plateful Pro restored. Everything is unlocked.'
+              : result.error ??
+                  'No previous purchase was found for this account. '
+                      'Make sure you are signed in to the same Google account '
+                      'you subscribed with.',
+        ),
+        duration: const Duration(seconds: 5),
       ),
     );
   }
@@ -625,6 +657,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     colors: colors,
                     trailing: _chevron(colors),
                     onTap: _openCustomerCenter,
+                  ),
+                  _Divider(colors),
+                  // Always available, not just to detected subscribers. This
+                  // is the recovery path when an entitlement is not being
+                  // picked up, and the store requires it to be reachable.
+                  _Row(
+                    icon: Icons.restore,
+                    label: 'Restore Purchases',
+                    colors: colors,
+                    trailing: _restoring
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : _chevron(colors),
+                    onTap: () {
+                      if (!_restoring) _restorePurchases();
+                    },
                   ),
                   _Divider(colors),
                   _Row(

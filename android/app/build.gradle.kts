@@ -7,6 +7,7 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
     // Firebase / Google services.
     id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics")
 }
 
 // ─── Load signing credentials from key.properties (never committed to VCS) ───

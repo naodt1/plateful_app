@@ -49,3 +49,7 @@ app.*.map.json
 android/key.properties
 *.jks
 *.keystore
+
+# Generated marketing assets (images, zips) — large binaries, not source
+.marketing/
+android/build/

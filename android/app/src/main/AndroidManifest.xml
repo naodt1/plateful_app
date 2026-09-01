@@ -1,5 +1,13 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Advertising id. Required by the Meta SDK to attribute installs to
+         Facebook ad campaigns; without it paid installs cannot be measured.
+         Declare "Advertising ID" collection in Play Data safety because of
+         this. Topics is unused, so it stays stripped. -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID"/>
+    <uses-permission android:name="android.permission.ACCESS_ADSERVICES_TOPICS"
+        tools:node="remove"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <!-- Trial-ending reminder (flutter_local_notifications) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
@@ -9,6 +17,29 @@
         android:label="Plateful"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+
+        <!-- Meta (Facebook) SDK. Values live in res/values/facebook.xml. -->
+        <meta-data
+            android:name="com.facebook.sdk.ApplicationId"
+            android:value="@string/facebook_app_id"/>
+        <meta-data
+            android:name="com.facebook.sdk.ClientToken"
+            android:value="@string/facebook_client_token"/>
+        <!-- The SDK must auto init: the Flutter plugin never calls
+             sdkInitialize itself and its calls fail without it.
+             Event logging starts off and is switched on from Dart in
+             MetaAds.init(), so debug builds send nothing. Advertiser id
+             collection has no runtime toggle on Android, so it is set here
+             and is what makes install attribution work. -->
+        <meta-data
+            android:name="com.facebook.sdk.AutoInitEnabled"
+            android:value="true"/>
+        <meta-data
+            android:name="com.facebook.sdk.AutoLogAppEventsEnabled"
+            android:value="false"/>
+        <meta-data
+            android:name="com.facebook.sdk.AdvertiserIDCollectionEnabled"
+            android:value="true"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"

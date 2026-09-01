@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../core/services/analytics_service.dart';
+import '../../../core/services/meta_ads_service.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
@@ -37,6 +39,8 @@ class _SignupScreenState extends State<SignupScreen> {
       _error = null;
     });
     try {
+      Analytics.signUp('email');
+      MetaAds.completedRegistration('email');
       await FirebaseService.signUpWithEmail(
         _emailController.text.trim(),
         _passwordController.text,
@@ -54,6 +58,8 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _googleSignIn() async {
     setState(() => _isLoading = true);
     try {
+      Analytics.signUp('google');
+      MetaAds.completedRegistration('google');
       await FirebaseService.signInWithGoogle();
       if (mounted) context.go('/home');
     } catch (e) {

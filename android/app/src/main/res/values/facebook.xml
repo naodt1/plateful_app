@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Meta (Facebook) SDK configuration.
+
+  Both values come from developers.facebook.com:
+    facebook_app_id      Settings > Basic > App ID
+    facebook_client_token Settings > Advanced > Client Token
+
+  Neither is a secret. The App ID is public, and the Client Token is designed
+  to ship inside the app, which is why they live in resources rather than .env.
+  The SDK will throw at startup if either is still the placeholder.
+-->
+<resources>
+    <string name="facebook_app_id">1065994416285250</string>
+    <string name="facebook_client_token">38d96306cf5ce549708ffaf04b08baa6</string>
+    <string name="fb_login_protocol_scheme">fb1065994416285250</string>
+</resources>

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/services/analytics_service.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -29,6 +30,7 @@ class _HealthifySheetState extends State<HealthifySheet> {
 
   Future<void> _healthify() async {
     try {
+      Analytics.healthifyUsed();
       final result = await ClaudeService.healthifyRecipe(widget.recipe.toJson());
       setState(() {
         _result = result;
