@@ -1,8 +1,9 @@
 rules_version = '2';
 
-// Plateful — every document lives under users/{uid}, so a user can only ever
-// read or write their own profile and subcollections (recipes, collections,
-// pantry_items, meal_plans, grocery_items).
+// Plateful — app data lives under users/{uid}, so a user can only ever read or
+// write their own profile and subcollections (recipes, collections,
+// pantry_items, meal_plans, grocery_items). web_conversions is the one
+// top-level collection, used by the landing page's free conversion tool.
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{uid} {
@@ -11,6 +12,14 @@ service cloud.firestore {
       match /{document=**} {
         allow read, write: if request.auth != null && request.auth.uid == uid;
       }
+    }
+
+    // One free recipe conversion per account on the landing page tool.
+    // Create-once by the owner: no update and no delete, so the record can't
+    // be cleared from a client to claim a second free conversion.
+    match /web_conversions/{uid} {
+      allow read, create: if request.auth != null && request.auth.uid == uid;
+      allow update, delete: if false;
     }
   }
 }
