@@ -21,5 +21,16 @@ service cloud.firestore {
       allow read, create: if request.auth != null && request.auth.uid == uid;
       allow update, delete: if false;
     }
+
+    // Shared remixes from the landing page tool. Public reads are the whole
+    // point: the link has to open for whoever it was sent to, signed in or
+    // not. Written once by the account that made the conversion, stamped with
+    // that uid, and immutable after, so a link never changes under anyone.
+    match /remixes/{remixId} {
+      allow read: if true;
+      allow create: if request.auth != null
+                    && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
   }
 }
