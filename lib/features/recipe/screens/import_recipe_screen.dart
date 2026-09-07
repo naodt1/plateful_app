@@ -17,6 +17,7 @@ import '../../../core/services/firebase_service.dart';
 import '../../../core/services/recipe_adapter.dart';
 import '../../../core/widgets/skeleton_loader.dart';
 import '../../../core/widgets/intelligence_mark.dart';
+import '../../../core/widgets/adapting_loader.dart';
 import '../../../models/recipe.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/utils/error_messages.dart';
@@ -38,6 +39,7 @@ class _ImportRecipeScreenState extends ConsumerState<ImportRecipeScreen> {
   String? _error;
   String? _noRecipeReason; // set when extraction detects no recipe (e.g. login wall)
   bool _outOfImports = false; // free allowance spent and the user declined Pro
+  String? _adaptingFor; // diet label while the recipe is being rewritten
   Recipe? _saved;
   String _status = _stages.first;
   Timer? _stageTimer;
@@ -157,11 +159,15 @@ class _ImportRecipeScreenState extends ConsumerState<ImportRecipeScreen> {
               ? restrictions.diet
               : 'your preferences';
           _stageTimer?.cancel();
-          setState(() => _status = 'Adapting it for $label…');
+          setState(() {
+            _status = 'Adapting it for $label…';
+            _adaptingFor = restrictions.diet != 'None' ? restrictions.diet : label;
+          });
         }
         finalRecipe = await RecipeAdapter.adaptOnImport(recipe);
       }
 
+      if (mounted && _adaptingFor != null) setState(() => _adaptingFor = null);
       final recipeId = await FirebaseService.saveRecipe(finalRecipe);
       Analytics.importSucceeded(
         source: source,
@@ -224,6 +230,7 @@ class _ImportRecipeScreenState extends ConsumerState<ImportRecipeScreen> {
             ? _ImportingView(
                 url: _extractUrl(widget.sharedUrl),
                 status: _status,
+                adaptingFor: _adaptingFor,
                 colors: colors)
             : _outOfImports
                 ? _OutOfImportsView(
@@ -352,9 +359,17 @@ class _OutOfImportsView extends StatelessWidget {
 class _ImportingView extends StatelessWidget {
   final String url;
   final String status;
+
+  /// Non null while the recipe is being rewritten for the user's diet, which
+  /// swaps in an animation about substitution rather than about reading.
+  final String? adaptingFor;
   final AppColorScheme colors;
-  const _ImportingView(
-      {required this.url, required this.status, required this.colors});
+  const _ImportingView({
+    required this.url,
+    required this.status,
+    required this.adaptingFor,
+    required this.colors,
+  });
 
   String get _host {
     final u = Uri.tryParse(url);
@@ -370,7 +385,18 @@ class _ImportingView extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Spacer(flex: 3),
-          const CookingLoader(size: 160),
+          // Reading and adapting are different jobs, so they get different
+          // animations. The swap animation also teaches the feature while
+          // the user waits for it.
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 450),
+            child: adaptingFor == null
+                ? const CookingLoader(key: ValueKey('reading'), size: 160)
+                : AdaptingLoader(
+                    key: const ValueKey('adapting'),
+                    dietLabel: adaptingFor!,
+                  ),
+          ),
           const SizedBox(height: 36),
 
           // Live status, cross-fading as the stages progress.

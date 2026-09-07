@@ -526,6 +526,7 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
                           _AdaptedBanner(
                             adaptedFor: _recipe!.adaptedFor!,
                             summary: _recipe!.adaptationSummary,
+                            swaps: _recipe!.adaptationSwaps,
                             showingOriginal: _showOriginal,
                             colors: colors,
                             onToggle: () => setState(
@@ -974,9 +975,16 @@ class _SectionHeader extends StatelessWidget {
 /// Compact chip shown when a recipe was rewritten for the user's diet on
 /// import. Kept to a single line to sit alongside the tag row; the full
 /// explanation lives behind a tap so it never dominates the page.
+/// Shows, prominently, that this recipe was rewritten for the user's diet and
+/// exactly what changed.
+///
+/// This used to be a small pill that had to be tapped to reveal anything. The
+/// substitutions are the most valuable thing the app produces, so they are now
+/// on the recipe itself rather than hidden behind a tap.
 class _AdaptedBanner extends StatelessWidget {
   final String adaptedFor;
   final String? summary;
+  final List<IngredientSwap>? swaps;
   final bool showingOriginal;
   final AppColorScheme colors;
   final VoidCallback onToggle;
@@ -984,6 +992,7 @@ class _AdaptedBanner extends StatelessWidget {
   const _AdaptedBanner({
     required this.adaptedFor,
     required this.summary,
+    required this.swaps,
     required this.showingOriginal,
     required this.colors,
     required this.onToggle,
@@ -1000,150 +1009,170 @@ class _AdaptedBanner extends StatelessWidget {
 
   String get _emoji => _dietEmoji[adaptedFor] ?? '🍽️';
 
-  void _showDetail(BuildContext context) {
-    final text = summary?.trim();
-    if (text == null || text.isEmpty) return;
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        decoration: BoxDecoration(
-          color: colors.bg,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: EdgeInsets.fromLTRB(
-            24, 16, 24, MediaQuery.of(context).padding.bottom + 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+  @override
+  Widget build(BuildContext context) {
+    // Viewing the original: keep it quiet and offer the way back.
+    if (showingOriginal) {
+      return _Shell(
+        colors: colors,
+        tint: colors.textSecondary,
+        child: Row(
           children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                    color: colors.border,
-                    borderRadius: BorderRadius.circular(2)),
+            Icon(Icons.history_rounded, size: 18, color: colors.textSecondary),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Showing the original recipe',
+                style: AppTextStyles.labelMedium
+                    .copyWith(color: colors.textPrimary),
               ),
             ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Text(_emoji, style: const TextStyle(fontSize: 20)),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text('Adapted for $adaptedFor',
-                      style: AppTextStyles.headingMedium),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Text(text,
-                style: AppTextStyles.bodyMedium
-                    .copyWith(color: colors.textSecondary, height: 1.5)),
-            const SizedBox(height: 16),
-            Text(
-              'Your original recipe is kept — tap “View original” any time.',
-              style:
-                  AppTextStyles.caption.copyWith(color: colors.textSecondary),
-            ),
-            const SizedBox(height: 22),
-            GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                alignment: Alignment.center,
-                child: const Text('Got it',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15)),
-              ),
-            ),
+            _ToggleLink(
+                label: 'View adapted',
+                color: AppColors.primary,
+                onTap: onToggle),
           ],
         ),
+      );
+    }
+
+    final list = swaps ?? const <IngredientSwap>[];
+    final shown = list.take(3).toList();
+    final extra = list.length - shown.length;
+    final text = summary?.trim();
+
+    return _Shell(
+      colors: colors,
+      tint: AppColors.primary,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(_emoji, style: const TextStyle(fontSize: 17)),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  'Adapted for $adaptedFor',
+                  style: AppTextStyles.labelLarge
+                      .copyWith(color: AppColors.primary),
+                ),
+              ),
+              _ToggleLink(
+                  label: 'View original',
+                  color: colors.textSecondary,
+                  onTap: onToggle),
+            ],
+          ),
+          if (shown.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            for (final s in shown)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 7),
+                child: _SwapLine(swap: s, colors: colors),
+              ),
+            if (extra > 0)
+              Text('and $extra more ${extra == 1 ? 'change' : 'changes'}',
+                  style: AppTextStyles.caption
+                      .copyWith(color: colors.textSecondary)),
+          ],
+          if (text != null && text.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              text,
+              style: AppTextStyles.bodySmall
+                  .copyWith(color: colors.textSecondary, height: 1.45),
+            ),
+          ],
+        ],
       ),
     );
   }
+}
+
+/// One substitution, in the same from and to language used everywhere else.
+class _SwapLine extends StatelessWidget {
+  final IngredientSwap swap;
+  final AppColorScheme colors;
+  const _SwapLine({required this.swap, required this.colors});
 
   @override
   Widget build(BuildContext context) {
-    final hasSummary = (summary?.trim().isNotEmpty ?? false);
-    final tint = showingOriginal ? colors.surface : AppColors.primary;
-
     return Row(
       children: [
         Flexible(
-          child: GestureDetector(
-            onTap: showingOriginal ? null : () => _showDetail(context),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-              decoration: BoxDecoration(
-                color: showingOriginal
-                    ? colors.surface
-                    : tint.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: showingOriginal
-                      ? colors.border
-                      : tint.withValues(alpha: 0.22),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (showingOriginal)
-                    Icon(Icons.history_rounded,
-                        size: 13, color: colors.textSecondary)
-                  else
-                    Text(_emoji, style: const TextStyle(fontSize: 12)),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      showingOriginal ? 'Original' : 'Adapted · $adaptedFor',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: showingOriginal
-                            ? colors.textSecondary
-                            : AppColors.primary,
-                      ),
-                    ),
-                  ),
-                  if (!showingOriginal && hasSummary) ...[
-                    const SizedBox(width: 5),
-                    Icon(Icons.info_outline_rounded,
-                        size: 12,
-                        color: AppColors.primary.withValues(alpha: 0.7)),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        GestureDetector(
-          onTap: onToggle,
-          behavior: HitTestBehavior.opaque,
           child: Text(
-            showingOriginal ? 'View adapted' : 'View original',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+            swap.from,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.bodySmall.copyWith(
               color: colors.textSecondary,
-              decoration: TextDecoration.underline,
+              decoration: TextDecoration.lineThrough,
               decorationColor: colors.textSecondary,
             ),
           ),
         ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Icon(Icons.arrow_forward_rounded,
+              size: 13, color: colors.textSecondary),
+        ),
+        Flexible(
+          child: Text(
+            swap.to,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.primary, fontWeight: FontWeight.w600),
+          ),
+        ),
       ],
+    );
+  }
+}
+
+class _ToggleLink extends StatelessWidget {
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _ToggleLink(
+      {required this.label, required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        child: Text(
+          label,
+          style: AppTextStyles.caption
+              .copyWith(color: color, fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
+  }
+}
+
+class _Shell extends StatelessWidget {
+  final Widget child;
+  final AppColorScheme colors;
+  final Color tint;
+  const _Shell(
+      {required this.child, required this.colors, required this.tint});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 12, 13),
+      decoration: BoxDecoration(
+        color: tint.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: tint.withValues(alpha: 0.20)),
+      ),
+      child: child,
     );
   }
 }

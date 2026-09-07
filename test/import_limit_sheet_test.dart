@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plateful/features/subscription/import_credits.dart';
+import 'package:plateful/features/subscription/pro_gate.dart';
 
 Future<BuildContext> _pumpHost(WidgetTester tester) async {
   late BuildContext ctx;
@@ -20,7 +21,10 @@ void main() {
     ImportLimitSheet.show(ctx);
     await tester.pumpAndSettle();
 
-    expect(find.text('You have used your 5 free imports'), findsOneWidget);
+    expect(
+      find.text('You have used your ${ProLimits.freeImports} free imports'),
+      findsOneWidget,
+    );
     expect(find.textContaining('costs us on each import'), findsOneWidget);
     expect(find.textContaining('add recipes by hand for free'), findsOneWidget);
     expect(find.text('See Plateful Pro'), findsOneWidget);

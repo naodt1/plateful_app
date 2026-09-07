@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/analytics_service.dart';
+import '../../../core/services/referral_service.dart';
 import '../../../core/services/meta_ads_service.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
@@ -19,6 +20,11 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _referralController = TextEditingController();
+
+  /// Collapsed by default: most users have no code, and an always visible
+  /// field on a signup form costs conversions.
+  bool _showReferral = false;
   final _formKey = GlobalKey<FormState>();
 
   bool _isLoading = false;
@@ -29,7 +35,19 @@ class _SignupScreenState extends State<SignupScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _referralController.dispose();
     super.dispose();
+  }
+
+  /// Save any entered code before the account is created. _ensureProfile
+  /// reads it back the moment the profile document is written.
+  Future<void> _stashReferral() async {
+    final raw = _referralController.text.trim();
+    if (raw.isEmpty) return;
+    final ok = await ReferralService.setPending(raw);
+    if (ok) {
+      Analytics.referralApplied(ReferralService.normalise(raw)!);
+    }
   }
 
   Future<void> _submit() async {
@@ -39,6 +57,7 @@ class _SignupScreenState extends State<SignupScreen> {
       _error = null;
     });
     try {
+      await _stashReferral();
       Analytics.signUp('email');
       MetaAds.completedRegistration('email');
       await FirebaseService.signUpWithEmail(
@@ -58,6 +77,7 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _googleSignIn() async {
     setState(() => _isLoading = true);
     try {
+      await _stashReferral();
       Analytics.signUp('google');
       MetaAds.completedRegistration('google');
       await FirebaseService.signInWithGoogle();
@@ -157,6 +177,14 @@ class _SignupScreenState extends State<SignupScreen> {
                                 return null;
                               },
                             ).animate().fadeIn(delay: 200.ms),
+                            const SizedBox(height: 16),
+                            _ReferralField(
+                              expanded: _showReferral,
+                              controller: _referralController,
+                              colors: colors,
+                              onExpand: () =>
+                                  setState(() => _showReferral = true),
+                            ).animate().fadeIn(delay: 220.ms),
                             const SizedBox(height: 24),
                             AirbnbButton(
                               label: 'Create Account',
@@ -250,6 +278,71 @@ class _ErrorBox extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Creator code entry, collapsed to a single line until tapped.
+///
+/// Most people arrive without a code, so this stays out of the way rather than
+/// adding a field everyone has to skip past.
+class _ReferralField extends StatelessWidget {
+  final bool expanded;
+  final TextEditingController controller;
+  final AppColorScheme colors;
+  final VoidCallback onExpand;
+
+  const _ReferralField({
+    required this.expanded,
+    required this.controller,
+    required this.colors,
+    required this.onExpand,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!expanded) {
+      return GestureDetector(
+        onTap: onExpand,
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.card_giftcard_rounded,
+                  size: 15, color: colors.textSecondary),
+              const SizedBox(width: 7),
+              Text(
+                'Have a creator code?',
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return TextFormField(
+      controller: controller,
+      autofocus: true,
+      textCapitalization: TextCapitalization.characters,
+      decoration: InputDecoration(
+        labelText: 'Creator code',
+        hintText: 'e.g. JANE',
+        prefixIcon: Icon(Icons.card_giftcard_rounded,
+            size: 19, color: colors.textSecondary),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: colors.border),
+        ),
+      ),
+      // Never block signup on a malformed code: an unusable one is simply
+      // ignored rather than standing between the user and their account.
+      validator: (_) => null,
     );
   }
 }

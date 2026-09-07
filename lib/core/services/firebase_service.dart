@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'referral_service.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../models/recipe.dart';
@@ -206,12 +207,22 @@ class FirebaseService {
     final fallbackName = (user.displayName?.trim().isNotEmpty ?? false)
         ? user.displayName
         : (user.email?.split('@').first ?? 'Chef');
+    // A creator code entered during onboarding is held locally until now,
+    // because there is no profile to write it to before the account exists.
+    final referral = await ReferralService.pending();
+
     await ref.set({
       'diet_mode': 'None',
       'display_name': fallbackName,
       'avatar_url': user.photoURL,
       'created_at': _nowIso(),
+      if (referral != null) 'referral_code': referral,
     });
+
+    if (referral != null) {
+      await ReferralService.attachToRevenueCat(referral);
+      await ReferralService.clearPending();
+    }
   }
 
   /// Permanently delete the signed-in user's account and all their data.

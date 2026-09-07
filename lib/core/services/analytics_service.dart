@@ -60,6 +60,18 @@ class Analytics {
   static Future<void> signUp(String method) =>
       _log('sign_up', {'method': method});
 
+  /// A creator referral code was entered. Also set as a user property so every
+  /// later event, including purchases, can be sliced by creator rather than
+  /// only the signup itself.
+  static Future<void> referralApplied(String code) async {
+    await _log('referral_applied', {'code': code});
+    try {
+      await _fa?.setUserProperty(name: 'referral_code', value: code);
+    } catch (e) {
+      debugPrint('Analytics: referral user property failed: \$e');
+    }
+  }
+
   static Future<void> login(String method) =>
       _log('login', {'method': method});
 
